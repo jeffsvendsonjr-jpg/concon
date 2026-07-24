@@ -30,9 +30,24 @@ const STYLE = `
     background: #f6f2ea;
     color: #1c1a17;
     border-left: 1px solid #d9d1c0;
-    box-shadow: -8px 0 24px rgba(28, 26, 23, 0.08);
+    /* Deep panel elevation: floats over ChatGPT's flat surface. Inset
+       highlight on the top-left simulates a raised edge catching light. */
+    box-shadow:
+      -18px 0 44px rgba(28, 26, 23, 0.16),
+      -2px 0 6px rgba(28, 26, 23, 0.06),
+      inset 1px 0 0 rgba(255, 253, 248, 0.9);
     z-index: 2147483647;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Letterpress: subtle 1px light shadow under serif characters mimics
+     ink pressed into cream paper. Applied to all serif text; skipped for
+     monospace where it reads muddled. */
+  .brand,
+  .empty,
+  .entry-body,
+  .topic-header {
+    text-shadow: 0 1px 0 rgba(255, 253, 248, 0.85);
   }
   .header {
     padding: 14px 18px 10px;
@@ -179,15 +194,32 @@ const STYLE = `
   }
   .topic-header:first-child { margin-top: 0; }
   .entry {
-    padding: 10px 12px 10px 14px;
+    padding: 12px 14px 12px 16px;
     border-left: 3px solid transparent;
-    margin: 8px 0;
+    margin: 10px 0;
     background: #fdfbf6;
-    border-radius: 2px;
-    transition: opacity 0.2s ease, background 0.15s ease;
+    border-radius: 4px;
+    /* Subtle card lift so entries clearly sit above the toolbar background. */
+    box-shadow:
+      0 1px 2px rgba(28, 26, 23, 0.06),
+      0 0 0 1px rgba(217, 209, 192, 0.4);
+    transition: opacity 0.2s ease, background 0.15s ease, box-shadow 0.15s ease;
   }
   .entry.role-user     { border-left-color: #b0632d; }
   .entry.role-assistant { border-left-color: #6a8a75; }
+  /* Pending entries stay bright cream; resolved ones fade back so the eye
+     lands on what still needs attention. */
+  .entry.resolved-affirm {
+    background: rgba(245, 242, 234, 0.75);
+    box-shadow:
+      0 0 0 1px rgba(61, 107, 70, 0.15);
+  }
+  .entry.resolved-neg {
+    background: rgba(245, 242, 234, 0.6);
+    box-shadow:
+      0 0 0 1px rgba(148, 64, 45, 0.15);
+    opacity: 0.75;
+  }
   .entry-header {
     display: flex;
     align-items: center;
@@ -203,15 +235,28 @@ const STYLE = `
   .role-label.role-user      { color: #8c4d20; }
   .role-label.role-assistant { color: #4d6a58; }
   .state-badge {
-    font-size: 9px;
-    letter-spacing: 0.1em;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255, 253, 248, 0.7);
+    border: 1px solid rgba(217, 209, 192, 0.6);
   }
   .state-badge.state-proposed,
   .state-badge.state-asserted { color: #7a715f; }
   .state-badge.state-confirmed,
-  .state-badge.state-acknowledged { color: #3d6b46; }
+  .state-badge.state-acknowledged {
+    color: #2f5c3a;
+    background: rgba(61, 107, 70, 0.10);
+    border-color: rgba(61, 107, 70, 0.35);
+  }
   .state-badge.state-dismissed,
-  .state-badge.state-contested { color: #94402d; }
+  .state-badge.state-contested {
+    color: #7a2d1e;
+    background: rgba(148, 64, 45, 0.10);
+    border-color: rgba(148, 64, 45, 0.35);
+  }
   .entry-body {
     font-size: 13px;
     line-height: 1.55;
@@ -227,38 +272,77 @@ const STYLE = `
   .entry.resolved-neg .entry-body {
     text-decoration: line-through;
     text-decoration-color: #94402d;
-    opacity: 0.55;
+    opacity: 0.7;
   }
-  .entry.resolved-neg { opacity: 0.75; }
+  .entry-body {
+    font-size: 13px;
+    line-height: 1.55;
+    color: #1c1a17;
+    cursor: pointer;
+    padding: 2px 0;
+    border-bottom: 1px dotted transparent;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .entry-body:hover {
+    color: #000;
+    border-bottom-color: #b0632d;
+  }
+  .entry.inferred .entry-body {
+    font-style: italic;
+    color: #4a453b;
+  }
   .hedge-note {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px;
-    color: #a89b7d;
-    letter-spacing: 0.06em;
-    margin-left: 4px;
-  }
-  .actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  .actions button {
-    all: unset;
-    padding: 3px 10px;
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 9px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    border: 1px solid #d9d1c0;
+    color: #8c4d20;
+    background: rgba(176, 99, 45, 0.12);
+    border: 1px solid rgba(176, 99, 45, 0.3);
+    border-radius: 999px;
+    vertical-align: middle;
+  }
+  .actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .actions button {
+    all: unset;
+    padding: 4px 12px;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border: 1px solid;
     border-radius: 999px;
     cursor: pointer;
-    color: #4a453b;
-    background: #f6f2ea;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-  .actions button:hover { background: #ebe5d3; }
-  .actions button.affirm:hover  { border-color: #3d6b46; color: #3d6b46; }
-  .actions button.negate:hover  { border-color: #94402d; color: #94402d; }
+  .actions button.affirm {
+    color: #3d6b46;
+    border-color: rgba(61, 107, 70, 0.45);
+    background: rgba(61, 107, 70, 0.06);
+  }
+  .actions button.affirm:hover {
+    background: #3d6b46;
+    color: #f6f2ea;
+    border-color: #3d6b46;
+  }
+  .actions button.negate {
+    color: #94402d;
+    border-color: rgba(148, 64, 45, 0.4);
+    background: rgba(148, 64, 45, 0.05);
+  }
+  .actions button.negate:hover {
+    background: #94402d;
+    color: #f6f2ea;
+    border-color: #94402d;
+  }
   .footer {
     padding: 10px 18px;
     border-top: 1px solid #e5dfd0;
@@ -276,13 +360,13 @@ const STYLE = `
 const LABELS = {
   user: {
     proposed:  { badge: 'proposed',  affirm: 'confirm', negate: 'dismiss', showActions: true },
-    confirmed: { badge: 'confirmed', showActions: false },
+    confirmed: { badge: 'confirmed', showActions: false, resolvedAffirm: true },
     dismissed: { badge: 'dismissed', showActions: false, resolvedNeg: true },
   },
   assistant: {
     asserted:     { badge: 'asserted',     affirm: 'acknowledge', negate: 'contest', showActions: true },
-    acknowledged: { badge: 'acknowledged', showActions: false },
-    contested:    { badge: 'contested',    showActions: false,    resolvedNeg: true },
+    acknowledged: { badge: 'acknowledged', showActions: false, resolvedAffirm: true },
+    contested:    { badge: 'contested',    showActions: false,   resolvedNeg: true },
   },
 };
 
@@ -483,11 +567,13 @@ function renderEntry(entry, searchQuery = '') {
   const role = entry.role;
   const labelSet = LABELS[role]?.[entry.state] || {};
   const isInferred = entry.state === 'proposed' || entry.state === 'asserted';
+  const isResolvedAffirm = !!labelSet.resolvedAffirm;
   const isResolvedNeg = !!labelSet.resolvedNeg;
   const classes = [
     'entry',
     `role-${role}`,
     isInferred ? 'inferred' : '',
+    isResolvedAffirm ? 'resolved-affirm' : '',
     isResolvedNeg ? 'resolved-neg' : '',
   ].filter(Boolean).join(' ');
 
