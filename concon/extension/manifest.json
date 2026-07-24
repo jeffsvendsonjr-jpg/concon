@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "ConCon",
+  "version": "0.1.0",
+  "description": "Bridge the human/LLM communication gap. Local, offline, no telemetry.",
+  "host_permissions": ["https://chatgpt.com/*"],
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["src/content/bootstrap.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/mount.js",
+        "src/content/observer.js",
+        "src/content/selectors.js",
+        "src/core/message-model.js",
+        "src/core/store.js",
+        "src/core/segmenter.js",
+        "src/core/outline.js",
+        "src/panel/panel.js"
+      ],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ],
+  "background": { "service_worker": "src/background/service-worker.js" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self'"
+  }
+}

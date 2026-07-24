@@ -1,8 +1,11 @@
+# dev / node
 node_modules/
-dist/
-build/
-.env
-.env.*
 .DS_Store
-Thumbs.db
 *.log
+
+# editor
+.vscode/
+.idea/
+
+# build artifacts (none in v0.1, but reserved)
+extension/dist/

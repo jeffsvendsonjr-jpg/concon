@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ConCon dev harness</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel-bg: #f6f2ea;
+      --ink: #1c1a17;
+      --muted: #7a715f;
+      --line: #d9d1c0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 14px 380px 14px 24px;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .controls button {
+      padding: 6px 12px;
+      margin-left: 6px;
+      border: 1px solid var(--line);
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.04em;
+      color: var(--ink);
+    }
+    .controls button:hover { background: #fbfaf7; }
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 24px 200px;
+      margin-right: 360px;
+    }
+    article[data-testid^="conversation-turn-"] {
+      margin: 14px 0;
+      padding: 14px 18px;
+      border: 1px solid #ebe5d3;
+      border-radius: 8px;
+      background: #fdfbf6;
+    }
+    article[data-testid^="conversation-turn-"] .role {
+      font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 8px;
+    }
+    article[data-testid^="conversation-turn-"] [data-message-id] {
+      font-size: 15px;
+      line-height: 1.6;
+    }
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ConCon dev harness &middot; mock ChatGPT DOM</h1>
+    <div class="controls">
+      <button id="load-fixture" data-testid="load-fixture-btn">Load fixture</button>
+      <button id="stream-next" data-testid="stream-next-btn">Stream turn</button>
+      <button id="regenerate" data-testid="regenerate-btn">Regenerate last</button>
+      <button id="reset" data-testid="reset-btn">Reset</button>
+    </div>
+  </header>
+  <main id="chat-root">
+    <div class="empty-state" data-testid="empty-state">
+      Click "Load fixture" to start a mock conversation.
+    </div>
+  </main>
+  <script type="module" src="./harness.js"></script>
+</body>
+</html>

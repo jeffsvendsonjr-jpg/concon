@@ -1,0 +1,40 @@
+// selectors.js
+//
+// Single source of truth for the ChatGPT DOM selectors ConCon depends on.
+// If ChatGPT changes its DOM, this is the file to hotfix — nothing else in
+// the codebase should reference these attribute names directly.
+//
+// Verified against chatgpt.com as of Jan 2026.
+
+export const selectors = {
+  // Wrapper for each turn (user or assistant). ChatGPT emits
+  // data-testid="conversation-turn-<N>".
+  turnArticle: 'article[data-testid^="conversation-turn-"]',
+
+  // The element carrying the canonical message id from the backend.
+  messageContainer: '[data-message-id]',
+
+  // Role attribute on (or inside) the message container.
+  authorRole: '[data-message-author-role]',
+
+  // Chat scroll root. Falls back to document.body if not found.
+  chatScrollRoot: 'main',
+};
+
+export function extractRole(el) {
+  const container = el?.closest?.(selectors.messageContainer);
+  if (!container) return null;
+  if (container.hasAttribute('data-message-author-role')) {
+    return container.getAttribute('data-message-author-role');
+  }
+  const inner = container.querySelector?.(selectors.authorRole);
+  return inner ? inner.getAttribute('data-message-author-role') : null;
+}
+
+export function extractText(el) {
+  const container = el?.closest?.(selectors.messageContainer);
+  if (!container) return '';
+  // innerText respects rendered whitespace; textContent does not. We prefer
+  // innerText, but fall back to textContent for non-DOM contexts (jsdom).
+  return (container.innerText ?? container.textContent ?? '').trim();
+}
