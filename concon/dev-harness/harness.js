@@ -6,20 +6,20 @@
 // invokes mount() directly.
 
 import { mount } from '../extension/src/content/mount.js';
-import { getConversation, _resetStore } from '../extension/src/core/store.js';
-import { updatePanelCounts } from '../extension/src/panel/panel.js';
+import { _resetStore } from '../extension/src/core/store.js';
 
-// A small fixture designed to exercise the segmenter: three distinct topics
-// with a shift cue, plus intra-topic follow-ups.
+// A fixture designed to exercise commitment extraction, topic segmentation,
+// and the ledger UI. Contains explicit commitment cues (let's, we should,
+// I'll, the plan is), definite assertions, one hedge, one shift cue.
 const FIXTURE = [
-  { role: 'user',      text: "Let's talk about ShieldVault traction. What's the fastest path to first ten customers?" },
-  { role: 'assistant', text: "Warm intros through your beachhead vertical will convert faster than cold outreach." },
-  { role: 'user',      text: "ok, go on" },
-  { role: 'assistant', text: "Rank prospects by an existing DLP budget and a champion who has felt paste-leak pain." },
-  { role: 'user',      text: "Switching gears — I'm thinking about the AI aftermarket. What niches look underserved?" },
-  { role: 'assistant', text: "Model-observability and prompt-versioning are hot but crowded. Conversation-audit tooling is genuinely open." },
-  { role: 'user',      text: "Different topic: how do I structure equity for a two-cofounder split with staged vesting?" },
-  { role: 'assistant', text: "Start 50/50, add a 4-year vest with a 1-year cliff, and make the acceleration triggers explicit." },
+  { role: 'user',      text: "Let's target Chrome MV3 for the extension." },
+  { role: 'assistant', text: "MV3 is a good choice for our constraints. I'll draft the manifest first." },
+  { role: 'user',      text: "We should skip Firefox for the v0.1 milestone." },
+  { role: 'assistant', text: "The plan is to target Chrome MV3 only. Firefox is deferred to v0.2." },
+  { role: 'user',      text: "What about the local model? I'm on the fence." },
+  { role: 'assistant', text: "I'll bundle a small NLI classifier. transformers.js is the right runtime." },
+  { role: 'user',      text: "Switching gears — let's design the ledger UI with dedicated confirm buttons." },
+  { role: 'assistant', text: "Dedicated buttons are the correct choice. I'll wire the callbacks tomorrow." },
 ];
 
 function fakeConversationId() {
@@ -62,15 +62,9 @@ function currentConversationId() {
 }
 
 function refreshPanelCounts() {
-  const host = document.getElementById('concon-panel-host');
-  if (!host?.shadowRoot) return;
-  const id = currentConversationId();
-  if (!id) return;
-  const conv = getConversation(id);
-  updatePanelCounts(host.shadowRoot, {
-    turnCount: conv.messages.length,
-    topicCount: conv.outline?.topics?.length || 0,
-  });
+  // No-op in step 4 — the panel now subscribes to store events directly
+  // via mount.js and re-renders itself. Kept as a stub for backward compat
+  // with any inline calls in the harness controls.
 }
 
 async function loadFixture() {

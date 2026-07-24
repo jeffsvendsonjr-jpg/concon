@@ -9,6 +9,7 @@
 
 import { makeMessageRecord } from './message-model.js';
 import { updateOutline } from './outline.js';
+import { updateLedger, transitionEntry } from './ledger.js';
 
 const state = {
   // conversationId → { messages: Map<messageId, MessageRecord>, order: number, outline: OutlineState|null }
@@ -21,7 +22,7 @@ let persistTimer = null;
 function getConv(conversationId) {
   let c = state.byConversation.get(conversationId);
   if (!c) {
-    c = { messages: new Map(), order: 0, outline: null };
+    c = { messages: new Map(), order: 0, outline: null, ledger: null };
     state.byConversation.set(conversationId, c);
   }
   return c;
@@ -46,9 +47,21 @@ export function ingest({ conversationId, id, role, text, observedAt }) {
     conv.messages.set(id, rec);
   }
   conv.outline = updateOutline(conv.outline, Array.from(conv.messages.values()));
+  conv.ledger = updateLedger(conv.ledger, Array.from(conv.messages.values()));
   schedulePersist();
   emit('turn:updated', { conversationId, id });
   return conv.messages.get(id);
+}
+
+export function transitionLedgerEntry(conversationId, entryId, newState) {
+  const conv = getConv(conversationId);
+  const next = transitionEntry(conv.ledger, entryId, newState);
+  if (next !== conv.ledger) {
+    conv.ledger = next;
+    schedulePersist();
+    emit('ledger:updated', { conversationId, entryId, newState });
+  }
+  return conv.ledger;
 }
 
 export function getConversation(conversationId) {
@@ -56,6 +69,7 @@ export function getConversation(conversationId) {
   return {
     messages: Array.from(conv.messages.values()).sort((a, b) => a.order - b.order),
     outline: conv.outline,
+    ledger: conv.ledger,
   };
 }
 
@@ -99,6 +113,7 @@ async function persistAll() {
         conversationId,
         messages: Array.from(conv.messages.values()),
         outline: conv.outline,
+        ledger: conv.ledger,
         updatedAt: Date.now(),
       });
     }

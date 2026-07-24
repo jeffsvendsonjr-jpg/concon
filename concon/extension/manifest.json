@@ -22,6 +22,9 @@
         "src/core/store.js",
         "src/core/segmenter.js",
         "src/core/outline.js",
+        "src/core/commitment-extract.js",
+        "src/core/ledger.js",
+        "src/core/search.js",
         "src/panel/panel.js"
       ],
       "matches": ["https://chatgpt.com/*"]
