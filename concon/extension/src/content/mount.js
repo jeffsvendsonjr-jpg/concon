@@ -13,7 +13,7 @@
 // chrome.* calls. bootstrap.js is what makes it chrome-aware.
 
 import { attachObserver, detachObserver } from './observer.js';
-import { attachDock, detachDock, refreshDock, toggleCollapsed, isCollapsed, onLayoutChange } from './dock.js';
+import { attachDock, detachDock, refreshDock, toggleCollapsed, isCollapsed, onLayoutChange, setConversationId } from './dock.js';
 import { runDockDiagnostic } from './diagnostic.js';
 import { renderPanel, updatePanel } from '../panel/panel.js';
 import {
@@ -120,6 +120,7 @@ async function onConversationChange() {
   const host = document.getElementById(HOST_ID);
   if (host) host.style.display = '';
   ensurePanelHost();
+  setConversationId(newId);
   await loadConversation(newId);
   unsubscribeTurns = on('turn:updated', ({ conversationId }) => {
     if (conversationId === currentConversationId) refreshPanel();

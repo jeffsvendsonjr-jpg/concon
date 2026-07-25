@@ -23,7 +23,7 @@ const STYLE = `
     top: 0;
     right: 0;
     bottom: 0;
-    width: 340px;
+    width: var(--concon-panel-width, 340px);
     display: flex;
     flex-direction: column;
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
@@ -82,7 +82,7 @@ const STYLE = `
   .collapse-toggle:hover { background: #ebe5d3; color: #1c1a17; }
   /* --- Collapsed rail --- */
   .root.collapsed {
-    width: 48px;
+    width: var(--concon-panel-collapsed-width, 48px);
   }
   .root.collapsed .header {
     padding: 12px 6px;
