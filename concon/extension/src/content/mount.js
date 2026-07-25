@@ -14,6 +14,7 @@
 
 import { attachObserver, detachObserver } from './observer.js';
 import { attachDock, detachDock, refreshDock, toggleCollapsed, isCollapsed, onLayoutChange } from './dock.js';
+import { runDockDiagnostic } from './diagnostic.js';
 import { renderPanel, updatePanel } from '../panel/panel.js';
 import {
   on,
@@ -151,4 +152,5 @@ function watchNavigation() {
 export function mount() {
   watchNavigation();
   onConversationChange();
+  runDockDiagnostic({ delay: 2000 });
 }

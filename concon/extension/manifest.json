@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ConCon",
-  "version": "0.1.0",
-  "description": "Bridge the human/LLM communication gap. Local, offline, no telemetry.",
+  "version": "0.1.1",
+  "description": "Bridge the human/LLM communication gap. Local, offline, no telemetry. (0.1.1 diagnostic build)",
   "host_permissions": ["https://chatgpt.com/*"],
   "permissions": ["storage"],
   "content_scripts": [
@@ -19,6 +19,7 @@
         "src/content/observer.js",
         "src/content/selectors.js",
         "src/content/dock.js",
+        "src/content/diagnostic.js",
         "src/core/message-model.js",
         "src/core/store.js",
         "src/core/segmenter.js",
