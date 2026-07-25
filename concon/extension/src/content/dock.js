@@ -37,24 +37,54 @@ function findMainContainer() {
   return document.querySelector(selectors.chatScrollRoot) || null;
 }
 
-function stashOriginalPadding(el) {
-  if (!el || el.hasAttribute('data-concon-original-padding-right')) return;
-  el.setAttribute('data-concon-original-padding-right', el.style.paddingRight || '');
+// Applies dock reservation via an injected <style> element rather than
+// inline styles on `main`. Rationale: ChatGPT is a React app; React
+// aggressively re-writes inline styles on the DOM elements it owns, which
+// silently strips our padding-right and leaves the panel overlaying the
+// conversation. A stylesheet rule survives rerenders because React doesn't
+// touch document-level <style> nodes.
+//
+// The `!important` here is scoped narrowly to our own selector
+// (`html[data-concon-layout="…"] main`), not applied to body — the
+// PHASE_A.md objection to Codex's `body { margin-right !important }` was
+// about global body-level side effects, not about scoped rules on the
+// specific layout hook we chose.
+
+const STYLE_EL_ID = 'concon-dock-stylesheet';
+
+function ensureStyleEl() {
+  let el = document.getElementById(STYLE_EL_ID);
+  if (el) return el;
+  el = document.createElement('style');
+  el.id = STYLE_EL_ID;
+  document.documentElement.appendChild(el);
+  return el;
 }
 
-function restoreOriginalPadding(el) {
-  if (!el) return;
-  if (el.hasAttribute('data-concon-original-padding-right')) {
-    el.style.paddingRight = el.getAttribute('data-concon-original-padding-right') || '';
-    el.removeAttribute('data-concon-original-padding-right');
+function writeDockCss(mode) {
+  const el = ensureStyleEl();
+  if (mode === 'docked-expanded') {
+    el.textContent = `
+      html[data-concon-layout="docked-expanded"] main {
+        padding-right: 340px !important;
+        transition: padding-right 0.18s ease;
+      }
+    `;
+  } else if (mode === 'docked-collapsed') {
+    el.textContent = `
+      html[data-concon-layout="docked-collapsed"] main {
+        padding-right: 48px !important;
+        transition: padding-right 0.18s ease;
+      }
+    `;
+  } else {
+    el.textContent = '';
   }
 }
 
-function setPadding(el, px) {
-  if (!el) return;
-  stashOriginalPadding(el);
-  el.style.transition = 'padding-right 0.18s ease';
-  el.style.paddingRight = px ? `${px}px` : '';
+function clearDockCss() {
+  const el = document.getElementById(STYLE_EL_ID);
+  if (el) el.textContent = '';
 }
 
 function computeMode() {
@@ -71,23 +101,17 @@ function notify() {
 }
 
 function apply() {
-  // Restore any prior padding on the previous container.
-  if (state.container) restoreOriginalPadding(state.container);
-
   let nextMode = computeMode();
   const container = findMainContainer();
   state.container = container;
 
-  if (nextMode === 'docked-expanded') {
-    if (container) setPadding(container, EXPANDED_WIDTH);
-    else nextMode = 'overlay';
-  } else if (nextMode === 'docked-collapsed') {
-    if (container) setPadding(container, COLLAPSED_WIDTH);
-    else nextMode = 'overlay';
+  if (nextMode === 'docked-expanded' || nextMode === 'docked-collapsed') {
+    if (!container) nextMode = 'overlay';
   }
 
   state.mode = nextMode;
   document.documentElement.setAttribute('data-concon-layout', nextMode);
+  writeDockCss(nextMode);
   notify();
 }
 
@@ -110,7 +134,7 @@ export function detachDock() {
   if (state.mediaQuery) state.mediaQuery.removeEventListener('change', apply);
   window.removeEventListener('resize', onResize);
   clearTimeout(state.resizeTimer);
-  restoreOriginalPadding(state.container);
+  clearDockCss();
   document.documentElement.removeAttribute('data-concon-layout');
   state.mediaQuery = null;
   state.container = null;
