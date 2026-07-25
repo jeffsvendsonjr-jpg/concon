@@ -152,5 +152,5 @@ function watchNavigation() {
 export function mount() {
   watchNavigation();
   onConversationChange();
-  runDockDiagnostic({ delay: 2000 });
+  runDockDiagnostic();
 }

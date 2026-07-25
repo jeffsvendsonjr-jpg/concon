@@ -2,19 +2,20 @@
 // and dumps a labeled report to the console so we can identify the actual
 // width-owning container in ChatGPT's live DOM.
 //
-// This is a temporary v0.1.0-diag helper. Delete once dock selectors are
-// verified against live ChatGPT.
+// v0.1.2: logs flat JSON strings (survives copy/paste) + probes fallback
+// turn selectors + retries turn detection.
 
 const TAG = '[ConCon Diag]';
 
 function box(el) {
+  if (!el) return null;
   const r = el.getBoundingClientRect();
   const cs = getComputedStyle(el);
   return {
     tag: el.tagName,
     id: el.id || '',
-    cls: (typeof el.className === 'string' ? el.className : (el.className?.baseVal || '')).slice(0, 120),
-    dataTestid: el.getAttribute?.('data-testid') || '',
+    cls: (typeof el.className === 'string' ? el.className : (el.className?.baseVal || '')).slice(0, 140),
+    testid: el.getAttribute?.('data-testid') || '',
     x: Math.round(r.left),
     y: Math.round(r.top),
     w: Math.round(r.width),
@@ -22,17 +23,18 @@ function box(el) {
     right: Math.round(r.right),
     display: cs.display,
     overflowX: cs.overflowX,
-    overflowY: cs.overflowY,
     position: cs.position,
     paddingRight: cs.paddingRight,
-    marginRight: cs.marginRight,
   };
+}
+
+function line(label, obj) {
+  console.log(`${TAG} ${label}: ${JSON.stringify(obj)}`);
 }
 
 function findWidthOwners() {
   const vw = window.innerWidth;
-  const all = Array.from(document.querySelectorAll('body *'));
-  return all
+  return Array.from(document.querySelectorAll('body *'))
     .filter((el) => {
       const r = el.getBoundingClientRect();
       return (
@@ -55,41 +57,65 @@ function ancestorsOf(el, stopAt = document.body) {
   return chain;
 }
 
-export function runDockDiagnostic({ delay = 1500 } = {}) {
-  setTimeout(() => {
-    try {
-      const layoutAttr = document.documentElement.getAttribute('data-concon-layout');
-      const styleEl = document.getElementById('concon-dock-stylesheet');
-      console.groupCollapsed(`${TAG} snapshot @ ${new Date().toISOString()}`);
-      console.log('viewport:', window.innerWidth, 'x', window.innerHeight);
-      console.log('html[data-concon-layout]:', layoutAttr);
-      console.log('injected stylesheet content:', styleEl?.textContent?.trim() || '(none)');
+// Try a few selectors that ChatGPT has used historically for turn wrappers.
+const TURN_SELECTOR_CANDIDATES = [
+  'article[data-testid^="conversation-turn-"]',
+  '[data-testid^="conversation-turn-"]',
+  '[data-message-id]',
+  '[data-message-author-role]',
+  'div.group\\/conversation-turn',
+];
 
-      const mainEl = document.querySelector('main');
-      console.log('main present:', !!mainEl);
-      if (mainEl) {
-        console.log('main box:', box(mainEl));
-      }
+function probeTurnSelectors() {
+  return TURN_SELECTOR_CANDIDATES.map((sel) => {
+    let count = 0;
+    try { count = document.querySelectorAll(sel).length; } catch (_) {}
+    return { sel, count };
+  });
+}
 
-      console.groupCollapsed(`${TAG} full-width candidates (top 15)`);
-      const owners = findWidthOwners();
-      owners.forEach((el, i) => console.log(i, box(el)));
-      console.groupEnd();
+function dump(reason) {
+  const layoutAttr = document.documentElement.getAttribute('data-concon-layout');
+  const styleEl = document.getElementById('concon-dock-stylesheet');
+  console.log(`${TAG} === snapshot (${reason}) @ ${new Date().toISOString()} ===`);
+  console.log(`${TAG} url: ${location.href}`);
+  console.log(`${TAG} viewport: ${window.innerWidth}x${window.innerHeight}`);
+  console.log(`${TAG} html[data-concon-layout]: ${layoutAttr}`);
+  console.log(`${TAG} injected stylesheet: ${JSON.stringify(styleEl?.textContent?.trim() || '(none)')}`);
 
-      const turns = document.querySelectorAll('article[data-testid^="conversation-turn-"]');
-      console.log(`turns detected: ${turns.length}`);
-      if (turns.length > 0) {
-        const first = turns[0];
-        console.log('first turn box:', box(first));
-        console.groupCollapsed(`${TAG} ancestor chain of first turn`);
-        ancestorsOf(first).forEach((a, i) => console.log(i, box(a)));
-        console.groupEnd();
-      }
+  const mainEl = document.querySelector('main');
+  line('main', box(mainEl));
 
-      console.log(`${TAG} → copy this ENTIRE group and paste it back to ConCon.`);
-      console.groupEnd();
-    } catch (err) {
-      console.error(TAG, 'diagnostic failed:', err);
+  const probes = probeTurnSelectors();
+  console.log(`${TAG} turn-selector probes: ${JSON.stringify(probes)}`);
+
+  const owners = findWidthOwners();
+  console.log(`${TAG} full-width candidates (count=${owners.length}):`);
+  owners.forEach((el, i) => line(`  cand[${i}]`, box(el)));
+
+  // First hit from whichever selector returned >0 turns.
+  let firstTurn = null;
+  for (const { sel, count } of probes) {
+    if (count > 0) {
+      try { firstTurn = document.querySelector(sel); } catch (_) {}
+      if (firstTurn) break;
     }
-  }, delay);
+  }
+  if (firstTurn) {
+    line('firstTurn', box(firstTurn));
+    console.log(`${TAG} ancestor chain of first turn:`);
+    ancestorsOf(firstTurn).forEach((a, i) => line(`  anc[${i}]`, box(a)));
+  } else {
+    console.log(`${TAG} no turns matched any candidate selector — either not on a chat URL or ChatGPT changed its DOM.`);
+  }
+
+  console.log(`${TAG} === end snapshot ===`);
+}
+
+export function runDockDiagnostic() {
+  // Fire two dumps: one quick (2s) and one late (6s) so we catch cases where
+  // ChatGPT streams the turn list in slowly on a slow connection or a
+  // heavy chat.
+  setTimeout(() => { try { dump('early'); } catch (e) { console.error(TAG, e); } }, 2000);
+  setTimeout(() => { try { dump('late'); } catch (e) { console.error(TAG, e); } }, 6000);
 }
