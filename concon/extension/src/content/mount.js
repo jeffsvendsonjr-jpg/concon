@@ -106,7 +106,18 @@ async function onConversationChange() {
   detachObserver();
   if (typeof unsubscribeTurns === 'function') { unsubscribeTurns(); unsubscribeTurns = null; }
   if (typeof unsubscribeLedger === 'function') { unsubscribeLedger(); unsubscribeLedger = null; }
-  if (!newId) return;
+  if (!newId) {
+    // Off any conversation route (e.g., homepage, /gpts, /settings).
+    // Hide the panel and release the dock reservation so ChatGPT
+    // reclaims its full width. The host DOM node stays in place so
+    // re-entering a conversation route re-uses it without a remount.
+    const host = document.getElementById(HOST_ID);
+    if (host) host.style.display = 'none';
+    detachDock();
+    return;
+  }
+  const host = document.getElementById(HOST_ID);
+  if (host) host.style.display = '';
   ensurePanelHost();
   await loadConversation(newId);
   unsubscribeTurns = on('turn:updated', ({ conversationId }) => {
@@ -116,7 +127,11 @@ async function onConversationChange() {
     if (conversationId === currentConversationId) refreshPanel();
   });
   attachObserver({ conversationId: newId });
-  refreshDock();
+  if (!document.documentElement.hasAttribute('data-concon-layout')) {
+    attachDock();
+  } else {
+    refreshDock();
+  }
   refreshPanel();
 }
 
