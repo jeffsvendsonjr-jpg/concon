@@ -18,6 +18,7 @@
         "src/content/mount.js",
         "src/content/observer.js",
         "src/content/selectors.js",
+        "src/content/dock.js",
         "src/core/message-model.js",
         "src/core/store.js",
         "src/core/segmenter.js",

@@ -50,11 +50,87 @@ const STYLE = `
     text-shadow: 0 1px 0 rgba(255, 253, 248, 0.85);
   }
   .header {
-    padding: 14px 18px 10px;
+    padding: 14px 14px 10px 18px;
     border-bottom: 1px solid #e5dfd0;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
+    gap: 8px;
+  }
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .collapse-toggle {
+    all: unset;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #7a715f;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .collapse-toggle:hover { background: #ebe5d3; color: #1c1a17; }
+  /* --- Collapsed rail --- */
+  .root.collapsed {
+    width: 48px;
+  }
+  .root.collapsed .header {
+    padding: 12px 6px;
+    justify-content: center;
+    border-bottom: 1px solid #e5dfd0;
+  }
+  .root.collapsed .header-titles,
+  .root.collapsed .toolbar,
+  .root.collapsed .body,
+  .root.collapsed .footer {
+    display: none;
+  }
+  .root.collapsed .rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 12px;
+    flex: 1;
+  }
+  .root:not(.collapsed) .rail { display: none; }
+  .rail-brand {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: #1c1a17;
+    text-shadow: 0 1px 0 rgba(255, 253, 248, 0.85);
+    user-select: none;
+  }
+  .rail-count {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #7a715f;
+    text-transform: uppercase;
+  }
+  .rail-count .n { color: #1c1a17; font-weight: 600; }
+  .rail-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #b0632d;
+    opacity: 0.6;
   }
   .brand {
     font-size: 20px;
@@ -384,8 +460,17 @@ export function renderPanel(shadowRoot, callbacks = {}) {
   root.setAttribute('data-testid', 'concon-panel');
   root.innerHTML = `
     <div class="header">
-      <span class="brand" data-testid="concon-brand">ConCon<span class="brand-dot">.</span></span>
-      <span class="tag" data-testid="concon-phase">v0.1 · ledger</span>
+      <div class="header-titles">
+        <span class="brand" data-testid="concon-brand">ConCon<span class="brand-dot">.</span></span>
+        <span class="tag" data-testid="concon-phase">v0.1 · ledger</span>
+      </div>
+      <button class="collapse-toggle" data-testid="collapse-toggle" title="collapse panel" aria-label="collapse panel">&rsaquo;</button>
+    </div>
+    <div class="rail" data-testid="concon-rail">
+      <button class="collapse-toggle" data-testid="expand-toggle" title="expand panel" aria-label="expand panel">&lsaquo;</button>
+      <span class="rail-brand">CONCON</span>
+      <span class="rail-count"><span class="n" data-testid="rail-entry-count">0</span> LEDGER</span>
+      <div class="rail-dot" data-testid="rail-pending-indicator" style="display:none"></div>
     </div>
     <div class="toolbar">
       <div class="toolbar-row">
@@ -423,6 +508,15 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     <div class="footer" data-testid="concon-footer">local · offline · no telemetry</div>
   `;
   shadowRoot.appendChild(root);
+
+  // Wire collapse/expand toggles.
+  const collapseHandler = () => {
+    if (callbacks.onToggleCollapse) callbacks.onToggleCollapse();
+  };
+  const collapseBtn = root.querySelector('[data-testid="collapse-toggle"]');
+  const expandBtn = root.querySelector('[data-testid="expand-toggle"]');
+  if (collapseBtn) collapseBtn.addEventListener('click', collapseHandler);
+  if (expandBtn) expandBtn.addEventListener('click', collapseHandler);
 
   // Wire the view-mode toggle.
   const toggleEl = root.querySelector('[data-testid="view-toggle"]');
@@ -475,12 +569,25 @@ export function renderPanel(shadowRoot, callbacks = {}) {
 // Update — called on every store event.
 // -----------------------------------------------------------------------------
 
-export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '' } = {}) {
+export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false } = {}) {
   if (!shadowRoot) return;
   const { messages = [], outline = null, ledger = null } = conversation || {};
   const turnCount = messages.length;
   const topicCount = outline?.topics?.length || 0;
   const entryCount = ledger?.entries?.length || 0;
+
+  // Root collapsed class + rail metrics.
+  const rootEl = shadowRoot.querySelector('[data-testid="concon-panel"]');
+  if (rootEl) rootEl.classList.toggle('collapsed', !!collapsed);
+  const railEntryCount = shadowRoot.querySelector('[data-testid="rail-entry-count"]');
+  if (railEntryCount) railEntryCount.textContent = String(entryCount);
+  const railDot = shadowRoot.querySelector('[data-testid="rail-pending-indicator"]');
+  if (railDot) {
+    const pending = (ledger?.entries || []).some(
+      (e) => e.state === 'proposed' || e.state === 'asserted'
+    );
+    railDot.style.display = pending ? 'block' : 'none';
+  }
 
   const t = shadowRoot.querySelector('[data-testid="turn-count"]');
   const p = shadowRoot.querySelector('[data-testid="topic-count"]');

@@ -13,6 +13,7 @@
 // chrome.* calls. bootstrap.js is what makes it chrome-aware.
 
 import { attachObserver, detachObserver } from './observer.js';
+import { attachDock, detachDock, refreshDock, toggleCollapsed, isCollapsed, onLayoutChange } from './dock.js';
 import { renderPanel, updatePanel } from '../panel/panel.js';
 import {
   on,
@@ -78,14 +79,24 @@ function ensurePanelHost() {
       searchQuery = String(query || '');
       refreshPanel();
     },
+    onToggleCollapse: () => {
+      toggleCollapsed();
+    },
   });
+  attachDock();
+  onLayoutChange(refreshPanel);
   return host;
 }
 
 function refreshPanel() {
   if (!shadowRoot || !currentConversationId) return;
   const conversation = getConversation(currentConversationId);
-  updatePanel(shadowRoot, { conversation, viewMode, searchQuery });
+  updatePanel(shadowRoot, {
+    conversation,
+    viewMode,
+    searchQuery,
+    collapsed: isCollapsed(),
+  });
 }
 
 async function onConversationChange() {
@@ -105,6 +116,7 @@ async function onConversationChange() {
     if (conversationId === currentConversationId) refreshPanel();
   });
   attachObserver({ conversationId: newId });
+  refreshDock();
   refreshPanel();
 }
 
