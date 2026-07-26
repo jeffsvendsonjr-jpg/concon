@@ -44,12 +44,30 @@ settle X?" — ConCon Check answers it in one tap.
   scoring, auto-bind vs. pin popover.
 - Feeds ConCon Check category #4.
 
-### Step 8 — Divergence detection · **P1**
+### Step 8 — Divergence detection + Inline Drift Markers · **P1**
 
 - `core/divergence.js` — the four divergence types (unconfirmed premise,
   contested basis, referent mismatch, assertion drift).
-- Divergence flags next to source turn and ledger entry.
-- Wary vigilance mode's proactive pings live here.
+- **Inline Drift Markers** — colored gutter stripes on the ChatGPT turn
+  in the host DOM itself. This is the killer surface of the feature: you
+  scroll your own chat and rogue turns call out to you. No need to open
+  the panel. Palette (letterpress-aligned):
+  - Rogue begin: deep amber (`#b0632d`) — assistant asserts something the
+    human never explicitly confirmed.
+  - Contested basis: rust red (`#a13a2b`) — assistant proceeds from a
+    contested premise.
+  - Ambiguous referent: ochre (`#c99a3a`) — new "the X"/"that"/pronoun
+    without a binding.
+  - Silent topic pivot: slate (`#6b7280`) — segmenter detected a shift
+    the assistant didn't acknowledge.
+  Rendering: 3px stripe on the turn's left edge + small dot in the
+  top-left corner; hover-tooltip explains the signal. Never mutates
+  ChatGPT's text — added-adjacent only.
+- **Vigilance-gated:** Explicit → no markers. Balanced → high-confidence
+  rogue-begin + contested-basis only. Wary → all four types + proactive
+  toast pings in the panel when a new divergence fires.
+- Divergence flags also appear in the panel next to the source turn and
+  the ledger entry.
 
 ### Step 8.5 — ConCon Check NLI upgrade · **P1**
 
