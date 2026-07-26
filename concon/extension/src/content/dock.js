@@ -32,6 +32,7 @@ const MODES = {
 
 const STYLE_EL_ID = 'concon-dock-stylesheet';
 const TARGET_ATTR = 'data-concon-target';
+const SHELL_ATTR = 'data-concon-shell';
 const STORAGE_PREFIX = 'concon:collapsed:';
 
 const state = {
@@ -117,15 +118,45 @@ function locateAndTagContainer() {
   return tagContainer(owner);
 }
 
+// Locate ChatGPT's app shell — the top-level .w-screen element. This is
+// the only element whose width we can actually shrink to reflow the chat
+// column; padding on body has no effect because .w-screen = 100vw ignores
+// its parent's box.
+function locateAndTagShell() {
+  // Try selector first (fast path, works with current Tailwind class).
+  let shell = document.querySelector(selectors.appShell);
+  // Fallback: any element whose computed width equals the viewport width.
+  if (!shell) {
+    const vw = window.innerWidth;
+    shell = Array.from(document.querySelectorAll('body > * , body > * > *'))
+      .find((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width >= vw - 4 && r.width <= vw + 4 && r.height > vw * 0.2;
+      }) || null;
+  }
+  if (!shell) return null;
+  // Clear stale shell tags.
+  document.querySelectorAll(`[${SHELL_ATTR}]`).forEach((n) => {
+    if (n !== shell) n.removeAttribute(SHELL_ATTR);
+  });
+  shell.setAttribute(SHELL_ATTR, 'true');
+  return shell;
+}
+
 function startContainerObserver() {
   stopContainerObserver();
   state.containerObserver = new MutationObserver(() => {
     // Re-tag opportunistically. Cheap because we only touch DOM if our
-    // tagged element is gone or a fresh turn appears.
-    const tagged = document.querySelector(`[${TARGET_ATTR}="true"]`);
-    if (!tagged || !document.body.contains(tagged)) {
+    // tagged element is gone or we haven't tagged anything yet (e.g.,
+    // turns hadn't rendered at first apply).
+    const container = document.querySelector(`[${TARGET_ATTR}="true"]`);
+    if (!container || !document.body.contains(container)) {
       const fresh = locateAndTagContainer();
       if (fresh) state.container = fresh;
+    }
+    const shell = document.querySelector(`[${SHELL_ATTR}="true"]`);
+    if (!shell || !document.body.contains(shell)) {
+      locateAndTagShell();
     }
   });
   state.containerObserver.observe(document.body, { childList: true, subtree: true });
@@ -168,21 +199,29 @@ function writeCss(mode, collapsed) {
     return;
   }
 
-  // Reflow rule: apply padding-right to BOTH the detected column container
-  // AND body. Body catches sites where the tagged container isn't the
-  // width owner; the tagged container catches sites where body is a fixed
-  // shell. Belt-and-suspenders because ChatGPT rewrites its DOM often.
+  // Reflow strategy: shrink the app shell (.w-screen) by ${activeWidth}px.
+  // Padding on body has no effect on ChatGPT's chat column because the
+  // shell is a Tailwind `w-screen` div (width: 100vw), which ignores its
+  // parent's box. Overriding its width via `!important` beats Tailwind's
+  // utility. `max-width` and `min-width` are set together to defeat any
+  // subsequent width-clamping utility.
+  //
+  // We also keep body padding + tagged-container padding as belt-and-
+  // suspenders for older / different ChatGPT builds that don't use
+  // .w-screen at the top.
   el.textContent = `
     ${rootVars}
+    html[data-concon-layout="docked"] [${SHELL_ATTR}="true"] {
+      width: calc(100vw - ${activeWidth}px) !important;
+      max-width: calc(100vw - ${activeWidth}px) !important;
+      min-width: 0 !important;
+      transition: width 0.18s ease, max-width 0.18s ease;
+    }
     html[data-concon-layout="docked"] body {
-      padding-right: ${activeWidth}px !important;
-      box-sizing: border-box !important;
-      transition: padding-right 0.18s ease;
+      padding-right: 0 !important;
     }
     html[data-concon-layout="docked"] [${TARGET_ATTR}="true"] {
-      padding-right: ${activeWidth}px !important;
-      box-sizing: border-box !important;
-      transition: padding-right 0.18s ease;
+      padding-right: 0 !important;
     }
   `;
 }
@@ -211,9 +250,10 @@ function apply() {
   const mode = computeMode();
   state.mode = mode;
 
-  // Tag container fresh each apply — cheap and keeps us honest as ChatGPT
-  // rerenders. If turns aren't there yet, container stays null and body
-  // padding still does the reflow.
+  // Tag both the app shell (for the actual reflow) and the conversation
+  // container (as a safety-net secondary target). Cheap; keeps us honest
+  // as ChatGPT rerenders.
+  locateAndTagShell();
   const owner = locateAndTagContainer();
   state.container = owner;
 
@@ -250,6 +290,7 @@ export function detachDock() {
   clearTimeout(state.resizeTimer);
   stopContainerObserver();
   document.querySelectorAll(`[${TARGET_ATTR}]`).forEach((n) => n.removeAttribute(TARGET_ATTR));
+  document.querySelectorAll(`[${SHELL_ATTR}]`).forEach((n) => n.removeAttribute(SHELL_ATTR));
   clearCss();
   document.documentElement.removeAttribute('data-concon-layout');
   document.documentElement.removeAttribute('data-concon-mode');

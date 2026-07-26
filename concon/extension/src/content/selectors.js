@@ -8,8 +8,9 @@
 
 export const selectors = {
   // Wrapper for each turn (user or assistant). ChatGPT emits
-  // data-testid="conversation-turn-<N>".
-  turnArticle: 'article[data-testid^="conversation-turn-"]',
+  // data-testid="conversation-turn-<N>". As of 2026-07 the wrapper is a
+  // <section>, not <article> — we intentionally don't lock the tag name.
+  turnArticle: '[data-testid^="conversation-turn-"]',
 
   // The element carrying the canonical message id from the backend.
   messageContainer: '[data-message-id]',
@@ -19,6 +20,11 @@ export const selectors = {
 
   // Chat scroll root. Falls back to document.body if not found.
   chatScrollRoot: 'main',
+
+  // Tailwind `w-screen` = width: 100vw. This is ChatGPT's top-level app
+  // shell. Reflowing anything inside this without shrinking it first is
+  // pointless — the shell is glued to the raw viewport width.
+  appShell: '.w-screen',
 };
 
 export function extractRole(el) {
