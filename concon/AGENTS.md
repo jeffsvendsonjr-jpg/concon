@@ -35,6 +35,54 @@ not resolve it. Reconciliation is always the participants' work.
 - The tool must have no opaque state of its own. A bridge with its own hidden
   agenda is not a bridge.
 
+## The Curator Principle
+
+The human ratifies. The tool never decides.
+
+ConCon extracts commitment-shaped statements, detects ambiguous referents,
+and surfaces divergence between what the assistant asserts and what the
+human confirmed. It never promotes an entry to confirmed shared state
+without an explicit human tap. It never resolves an ambiguous referent
+without a human pin. It never contests an assistant assertion without a
+human challenge.
+
+The value of ConCon is a **continuity positive feedback loop**: user
+ratifies → ledger records → panel surfaces → user references in the next
+turn → assistant sees the shared state stated back → drift reduced. This
+loop stabilizes long conversations that would otherwise degrade into
+noise. But positive feedback loops amplify errors as readily as truths;
+therefore:
+
+- The "contest" affordance must be as prominent as "confirm." Cheap
+  unwinding matters as much as cheap ratification.
+- Latent state is never confirmed state. Extractors and local models
+  propose; they do not decide. A commitment cannot cross from proposed to
+  confirmed without a human action.
+- Vigilance modes (see below) control the *proposal rate*, not the
+  ratification threshold. The user calibrates how much noise the tool is
+  allowed to make, but the tool never speaks *for* the user.
+
+## Vigilance modes
+
+Different conversations warrant different scrutiny. Casual brainstorming
+and legal-adjacent drafting cannot share one threshold. ConCon exposes
+three named modes (never a raw slider — users don't know where to put a
+number), stored per-conversation:
+
+- **Explicit only.** Ledger records commitments with clear illocutionary
+  force ("I will X", "we agreed X"). Ignores hedges. Ignores referents.
+  Silent unless the assistant asserts something the human explicitly said.
+- **Balanced (default).** Current heuristics. Moderate confidence floor.
+  Referent ambiguity surfaced when it crosses threshold.
+- **Wary.** Everything above, plus proactive divergence pings when the
+  assistant asserts "as you mentioned" / "you agreed" and the referenced
+  content is not in the confirmed set. Wary is the human's declaration
+  that this conversation matters and interruption is preferable to drift.
+
+Vigilance is the human side of the Curator Principle. The user still
+ratifies every entry; vigilance only shapes what gets proposed for
+ratification.
+
 ## Current scope
 
 This repository is an architecture-first prototype. The v0.1 goal is a

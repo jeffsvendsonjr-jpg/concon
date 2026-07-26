@@ -1,6 +1,9 @@
 # ConCon — Product Requirements Document
 
-**Status:** v0.1 substrate + ledger + search complete (steps 1–5 of arch review §9).
+**Status:** v0.2.0 shipped — three-mode responsive dock, default collapsed
+everywhere, per-conversation collapse persistence, dynamic container
+detection. Live-ChatGPT reflow verification pending (user testing on
+split-screen setup).
 
 ## Original problem statement
 
@@ -38,6 +41,46 @@ Full doctrine in `/app/concon/AGENTS.md`.
   confirmed shared state. Promotion requires explicit human action.
 
 ## What's been implemented
+
+### 2026-07-25 · v0.2.0 dock rework + strategy sidebar
+
+**Dock (steps completed):**
+- Three responsive modes replace the previous two: `wide` (≥1150px,
+  340/48), `narrow` (700–1149px, 300/40 slim rail — split-screen sweet
+  spot), `overlay` (<700px, no reflow).
+- Default state is **collapsed at every viewport width**. Progressive
+  disclosure. The rail is always visible; expansion is a deliberate act.
+- Collapse preference persists per conversation via localStorage
+  (`concon:collapsed:<conversationId>`).
+- Dynamic container detection: dock walks ancestors of the first
+  ChatGPT turn and tags the widest full-width one with
+  `data-concon-target`. Injected stylesheet applies `padding-right` to
+  that element *and* to `body` as a safety net. A MutationObserver
+  re-tags if React strips the attribute.
+- CSS custom properties (`--concon-panel-width`,
+  `--concon-panel-collapsed-width`) cascade from `:root` into the
+  shadow-DOM panel via `:host` variable inheritance, so panel width
+  auto-matches the dock's chosen mode.
+- Version 0.2.0, packaged at `/app/frontend/public/concon-extension.zip`.
+
+**Strategy decisions (locked into `AGENTS.md` and `docs/ROADMAP.md`):**
+- **The Curator Principle** added to doctrine: the human ratifies, the
+  tool never decides. The "continuity positive feedback loop" is the
+  product's core mechanic; positive feedback amplifies errors as readily
+  as truths, so the contest affordance must equal the confirm affordance.
+- **Vigilance modes** — three named states (Explicit / Balanced / Wary),
+  per-conversation. Vigilance controls proposal rate, never ratification.
+  Wary is where proactive divergence pings live.
+- **ConCon Check** — impromptu, user-initiated view of open loops
+  (assistant asked/user didn't answer; user asked/assistant sidestepped;
+  stale proposals; unbound referents). Now **P0**, sequenced ahead of
+  Step 6 as the product's elevator pitch demonstrator.
+- **Pricing model** — v0.x MIT-licensed free; v1.0 dual-tier ($6/mo or
+  $48/yr Pro, $79 lifetime capped); no team tier until pulled by demand;
+  never gate the core ledger insight.
+- **iOS strategy** — deferred until Chrome traction. `core/` stays
+  runtime-agnostic to keep Safari extension and Core ML companion app
+  paths cheap.
 
 ### 2026-01-24 · steps 1–5 (substrate + ledger + search)
 
@@ -119,7 +162,17 @@ the whole tree.
 
 ## Prioritized backlog
 
-### P0 — steps 6–7 (Path B: bundled local model)
+See `/app/concon/docs/ROADMAP.md` for the living roadmap. Priority
+snapshot as of v0.2.0:
+
+### P0 — Step 5.5 · ConCon Check (heuristic)
+
+On-demand "open loops" view. Button + Cmd/Ctrl+Shift+K keyboard shortcut.
+Four categories: assistant-asked-user-didn't-answer, user-asked-assistant-
+sidestepped, stale proposals, unbound referents. Impromptu only.
+Sequenced ahead of the local model because it's the elevator pitch.
+
+### P0 — Step 6 · Bundled local model runtime
 
 - `ml/runtime.js` — transformers.js lazy loader, hash verification, warm-up.
 - `ml/models/README.md` — model IDs, versions, licenses, SHA-256 hashes.
@@ -128,23 +181,33 @@ the whole tree.
 - `ml/embeddings.js` — MiniLM-class sentence embeddings for dedup +
   referent scoring + assertion-drift detection.
 
-### P1 — step 7 (referent tracker)
+### P1 — Step 7 · Referent tracker
 
 - `core/referent-scan.js` — pronoun/definite-NP detection, candidate
-  scoring, auto-bind vs. pin popover.
+  scoring, auto-bind vs. pin popover. Feeds ConCon Check category #4.
 
-### P1 — step 8 (divergence indicator)
+### P1 — Step 8 · Divergence detection + Wary vigilance
 
-- `core/divergence.js` — the 4 divergence types (unconfirmed premise,
-  contested basis, referent mismatch, assertion drift).
-- Divergence flags in the panel next to the source turn and the ledger entry.
+- `core/divergence.js` — the 4 divergence types.
+- Wary vigilance mode: proactive divergence pings.
+- Divergence flags in the panel next to the source turn and ledger entry.
+
+### P1 — Step 8.5 · ConCon Check NLI upgrade
+
+Replace content-word overlap with entailment scoring now that the local
+model runtime is available. Accuracy jumps ~80% → ~95%.
+
+### P1 — Vigilance modes UI
+
+Three-mode toggle (Explicit / Balanced / Wary) in panel header,
+per-conversation persistence.
 
 ### P2 — deferred structural work
 
 - **Regenerate handling** — link via `regeneratesId`, follow visible branch.
-- **Real-Chrome verification pass** — load `extension/` in Chrome against
-  a live long ChatGPT conversation, verify selectors, docking, SPA nav.
-  Fix in `selectors.js` if the current attributes have moved.
+- **Cross-conversation memory** (paid tier) — IndexedDB-backed ledger
+  across `/c/…` routes.
+- **Exports** (paid tier) — Markdown / JSON export of confirmed shared state.
 
 ### Open questions (blockers for later steps)
 
@@ -152,20 +215,19 @@ the whole tree.
 - Q4 — propose specific model IDs autonomously, or wait for user pick.
 - Q5 — divergence noise tolerance (recommend over-flag in v0.1).
 
-### Deferred (v0.2+)
+### Deferred (v2.0+)
 
-- Nested topic hierarchy.
-- Confidence surfacing on assistant claims.
-- Feeding confirmed shared state back into the model's context.
-- Cross-conversation ledger transport.
+- Team tier ($15/user/mo, min 3 seats) if pulled by demand.
+- Safari Web Extension port.
+- Companion iOS app + Share Sheet + Core ML.
 - Firefox parity.
 - Chrome Web Store submission.
 
 ## Next actions
 
-1. User loads the extension in real Chrome, verifies against a live
-   long ChatGPT conversation, reports any DOM-selector or docking issues.
-2. Consider "Save to GitHub" so the repo is durable independent of this
-   session.
-3. Main agent proceeds to steps 6–7 (Path B model runtime + referent
-   tracker) — non-blocking on Chrome verification.
+1. **User verification of v0.2.0** on live ChatGPT in split-screen setup.
+   Confirm: rail visible by default, no text overlap, expansion reflows
+   cleanly, collapse state persists across refresh.
+2. **Step 5.5 — ConCon Check (heuristic)** implementation.
+3. **Step 6 — bundled local model runtime.**
+4. **Save to GitHub** so the repo is durable independent of this session.
