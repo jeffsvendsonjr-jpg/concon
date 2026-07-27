@@ -62,6 +62,37 @@ therefore:
   ratification threshold. The user calibrates how much noise the tool is
   allowed to make, but the tool never speaks *for* the user.
 
+## Target user and the anti-sycophancy stance
+
+ConCon has an implicit target user: someone who wants an
+**adversarial-collaborator dynamic** with the model, not a validation
+dynamic. Someone who prefers being told an idea won't work over being
+told it's brilliant. Someone whose creative process depends on adversarial
+pressure to filter volume down to quality — the "one brilliant idea in
+100,000, fine by me" temperament.
+
+RLHF-trained models tend toward sycophancy — pattern-matched agreement,
+praise, mirror-language — because reward-model training implicitly
+optimizes for user-preferred responses, and users unconsciously prefer
+being agreed with. This produces a devastating combination for people
+actually trying to make something: confidence in the ideator rises while
+the quality signal falls. Bad ideas held with high conviction.
+
+ConCon exists in service of users who explicitly reject that dynamic.
+The tool must therefore embody the same value in its own behavior:
+
+- No congratulatory framing in surfaced entries ("great question," "nice
+  point," etc. are banned from the copy).
+- Divergence markers are neutral, not encouraging. Rogue-begin is a
+  signal, not a scold.
+- The panel copy states what is, not how the user feels about what is.
+- Any future in-product AI (local model runtime) inherits the same
+  discipline: propose candidates, mark confidence, never editorialize.
+
+There is a very large user segment that prefers sycophantic interaction
+patterns. ConCon has nothing to offer them, and should not try. Products
+that try to serve everyone serve no one.
+
 ## Vigilance modes
 
 Different conversations warrant different scrutiny. Casual brainstorming
