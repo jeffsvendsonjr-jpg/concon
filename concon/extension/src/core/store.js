@@ -140,6 +140,13 @@ export async function loadConversation(conversationId) {
         for (const m of row.messages) conv.messages.set(m.id, m);
         conv.outline = row.outline || null;
         conv.order = Math.max(0, ...row.messages.map((m) => m.order || 0));
+        // Restore the ledger too. Prefer the persisted row so user-set
+        // states (confirmed / contested / dismissed) survive the reload.
+        // If the persisted ledger is missing, rebuild deterministically
+        // from restored messages — otherwise the panel would show zero
+        // entries until a new turn arrives (extractor short-circuits on
+        // identical text via ingest()).
+        conv.ledger = row.ledger || updateLedger(null, Array.from(conv.messages.values()));
         res(row);
       };
       req.onerror = () => rej(req.error);

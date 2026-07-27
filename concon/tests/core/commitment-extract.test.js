@@ -168,3 +168,47 @@ test('unknown roles are ignored', () => {
   const out = extractFromMessage({ id: 'x', order: 1, role: 'system', text: "I will do something." });
   assert.equal(out.length, 0);
 });
+
+
+// -------------------- v0.3 extractor gap fixes --------------------
+
+test('extracts bare "I want X" (no infinitive)', () => {
+  // Human review flagged: "I want Facebook included if technically possible"
+  // was missed by the previous extractor which required "I want to ...".
+  const out = extractFromMessage(
+    msg({ id: 'g1', order: 1, role: 'user', text: "I want Facebook included if technically possible." })
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].classification, 'commitment');
+  assert.equal(out[0].hedged, true, 'conditional "if technically possible" must hedge');
+});
+
+test('extracts "I need X" without infinitive', () => {
+  const out = extractFromMessage(
+    msg({ id: 'g2', order: 1, role: 'user', text: "I need Facebook desktop support." })
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].classification, 'commitment');
+});
+
+test('extracts "I\'d like ..." as a commitment', () => {
+  const out = extractFromMessage(
+    msg({ id: 'g3', order: 1, role: 'user', text: "I'd like a warning banner when nothing is detected." })
+  );
+  assert.equal(out.length, 1);
+  assert.equal(out[0].classification, 'commitment');
+});
+
+test('recognizes conditional hedges beyond "maybe/might"', () => {
+  const cases = [
+    "Ship it if feasible.",
+    "Add caching when possible.",
+    "Include Facebook if we can.",
+    "Enforce lint provided that CI is green.",
+  ];
+  for (const text of cases) {
+    const out = extractFromMessage(msg({ id: 'h', order: 1, role: 'user', text }));
+    assert.ok(out.length > 0, `should extract from: ${text}`);
+    assert.equal(out[0].hedged, true, `conditional hedge should register on: ${text}`);
+  }
+});

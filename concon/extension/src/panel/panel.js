@@ -14,6 +14,7 @@
 
 import { groupByTopic } from '../core/ledger.js';
 import { searchLedger, countTranscriptOnly, highlightMatch } from '../core/search.js';
+import { runCheck, formatStatusHeadline } from '../core/concon-check.js';
 
 const STYLE = `
   :host { all: initial; }
@@ -371,6 +372,154 @@ const STYLE = `
   }
   /* Hide the view toggle until it's meaningful (2+ topics AND some entries). */
   .view-toggle.hidden { display: none; }
+  /* CHECK button — impromptu state-integrity audit. Lives in the toolbar
+     next to the view toggle. Prominent because Check is the elevator-pitch
+     surface for the whole product. */
+  .check-btn {
+    all: unset;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f6f2ea;
+    background: #1c1a17;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .check-btn:hover { background: #3a342a; }
+  /* Report view — replaces the ledger body while Check is active. */
+  .report {
+    padding: 4px 4px 14px;
+  }
+  .report-back {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a715f;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .report-back:hover { color: #1c1a17; background: #ebe5d3; }
+  .report-headline {
+    padding: 12px 14px;
+    border-radius: 4px;
+    border: 1px solid #d9d1c0;
+    background: #fbfaf7;
+    margin-bottom: 12px;
+  }
+  .report-headline.status-pass { border-color: #7a8f5a; background: #f0f5e6; }
+  .report-headline.status-review { border-color: #b0632d; background: #faedde; }
+  .report-headline.status-partial { border-color: #a89b7d; background: #f2ecdd; }
+  .report-status {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #1c1a17;
+    font-weight: 600;
+  }
+  .report-headline p {
+    margin: 6px 0 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #4a453b;
+  }
+  .report-counts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    background: #ebe5d3;
+    margin-bottom: 12px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: #4a453b;
+  }
+  .report-counts .n {
+    font-weight: 600;
+    color: #1c1a17;
+    font-variant-numeric: tabular-nums;
+  }
+  .report-h5 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a715f;
+    margin: 12px 0 6px;
+  }
+  .report-empty {
+    padding: 12px;
+    color: #4a453b;
+    font-size: 12px;
+    line-height: 1.5;
+    font-style: italic;
+    border: 1px dashed #c9bfa9;
+    border-radius: 4px;
+  }
+  .finding {
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid #d9d1c0;
+    background: #fbfaf7;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .finding:hover { background: #f6f2ea; border-color: #b0632d; }
+  .finding-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: #7a715f;
+    margin-bottom: 4px;
+  }
+  .finding-kind {
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #1c1a17;
+  }
+  .finding-kind.kind-stale-open { color: #a13a2b; }
+  .finding-kind.kind-unresolved-human { color: #b0632d; }
+  .finding-kind.kind-unresolved-assistant { color: #6b7280; }
+  .finding-kind.kind-contested { color: #a13a2b; }
+  .finding-age {
+    color: #7a715f;
+  }
+  .finding-body {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1c1a17;
+  }
+  .finding-hedge {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    color: #7a715f;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-left: 4px;
+  }
+  .report-scope-note {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-left: 2px solid #d9d1c0;
+    font-size: 11px;
+    color: #7a715f;
+    line-height: 1.55;
+    font-style: italic;
+  }
   .topic-header {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 10px;
@@ -597,6 +746,7 @@ export function renderPanel(shadowRoot, callbacks = {}) {
           <button data-view="chronological" class="active" data-testid="view-chronological-btn">chrono</button>
           <button data-view="topic" data-testid="view-topic-btn">topic</button>
         </div>
+        <button class="check-btn" data-testid="check-btn" title="run a state-integrity check">check</button>
       </div>
       <div class="toolbar-row search-row">
         <input
@@ -619,7 +769,7 @@ export function renderPanel(shadowRoot, callbacks = {}) {
           <li><strong>Confirm</strong> — lock it into the shared record.</li>
           <li><strong>Contest</strong> — flag it as wrong or unwanted.</li>
         </ul>
-        <p>Nothing gets saved unless you say so. Tap the <span class="k">?</span> above for more.</p>
+        <p>Everything stays on your device. Tap the <span class="k">?</span> above for more.</p>
       </div>
     </div>
     <div class="overlay" data-testid="help-overlay">
@@ -635,8 +785,8 @@ export function renderPanel(shadowRoot, callbacks = {}) {
           <li><strong>Drift</strong> — the assistant assumes something you never confirmed. Coming soon: colored markers on the chat itself so you can spot it while scrolling.</li>
         </ul>
 
-        <h5>What stays on your device</h5>
-        <p>Everything. No accounts, no telemetry, no external APIs. Your conversation is never sent anywhere. Close the tab and the ledger is gone.</p>
+        <h5>Where your data lives</h5>
+        <p>On this device only. ConCon stores observed turns and your ledger in your browser (IndexedDB) so both survive a refresh. Nothing is sent to ConCon, OpenAI, or any external service. There are no accounts, no telemetry, no API calls. To wipe everything, clear the extension's site data or uninstall it.</p>
 
         <div class="overlay-actions">
           <button class="overlay-btn" data-testid="help-close-btn">got it</button>
@@ -725,9 +875,23 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     searchInput.focus();
   });
 
+  // CHECK button — open the state-integrity report view.
+  const checkBtn = root.querySelector('[data-testid="check-btn"]');
+  if (checkBtn) checkBtn.addEventListener('click', () => {
+    reportOpen = true;
+    if (callbacks.onOpenCheck) callbacks.onOpenCheck();
+  });
+
   // Delegated click handlers for entries: action buttons + click-to-jump.
   const body = root.querySelector('[data-testid="ledger-body"]');
   body.addEventListener('click', (ev) => {
+    // Report "back" button — return to the ledger view.
+    const backBtn = ev.target.closest('[data-testid="report-back-btn"]');
+    if (backBtn) {
+      reportOpen = false;
+      if (callbacks.onCloseCheck) callbacks.onCloseCheck();
+      return;
+    }
     const actionBtn = ev.target.closest('button[data-action]');
     if (actionBtn) {
       const entryId = actionBtn.getAttribute('data-entry-id');
@@ -748,6 +912,14 @@ export function renderPanel(shadowRoot, callbacks = {}) {
 // -----------------------------------------------------------------------------
 // Update — called on every store event.
 // -----------------------------------------------------------------------------
+
+// Whether the panel is currently showing the ConCon Check report instead
+// of the ledger. Module-level because the panel is re-rendered on every
+// store event and we want the report to persist across those renders
+// until the user explicitly returns to the ledger.
+let reportOpen = false;
+
+export function isReportOpen() { return reportOpen; }
 
 export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false } = {}) {
   if (!shadowRoot) return;
@@ -808,6 +980,22 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
   const body = shadowRoot.querySelector('[data-testid="ledger-body"]');
   if (!body) return;
 
+  // Report view — replaces the ledger while the user is running a Check.
+  if (reportOpen) {
+    const report = runCheck({
+      messages,
+      ledger,
+      outline,
+      // Coverage detection is honest-scope for v0: we cannot verify we
+      // observed the entire conversation (ChatGPT virtualizes long chats
+      // and only rendered turns hit our MutationObserver). Report 'unknown'
+      // until we build proper coverage detection.
+      coverage: 'unknown',
+    });
+    body.innerHTML = renderReport(report);
+    return;
+  }
+
   // Empty state.
   if (!ledger || ledger.entries.length === 0) {
     body.innerHTML = `
@@ -818,7 +1006,7 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
           <li><strong>Confirm</strong> — lock it into the shared record.</li>
           <li><strong>Contest</strong> — flag it as wrong or unwanted.</li>
         </ul>
-        <p>Nothing gets saved unless you say so. Tap the <span class="k">?</span> above for more.</p>
+        <p>Everything stays on your device. Tap the <span class="k">?</span> above for more.</p>
       </div>
     `;
     return;
@@ -933,6 +1121,86 @@ function renderByTopic(fullLedger, outline, visibleEntries, searchQuery = '') {
     parts.push(kept.map((e) => renderEntry(e, searchQuery)).join(''));
   }
   return parts.join('');
+}
+
+// -----------------------------------------------------------------------------
+// ConCon Check report rendering.
+// -----------------------------------------------------------------------------
+
+const FINDING_LABELS = {
+  'stale-open':             'stale (unresolved for 5+ turns)',
+  'unresolved-human':       'your proposal — awaiting your ratification',
+  'unresolved-assistant':   'assistant assertion — awaiting your response',
+  'contested':              'contested — recorded disagreement',
+};
+
+function renderReport(report) {
+  const headline = formatStatusHeadline(report);
+  const cls = `status-${report.status}`;
+
+  const scopeNote = `
+    <div class="report-scope-note" data-testid="report-scope-note">
+      This is a state-integrity audit — a report of what the ledger already
+      knows. It does not yet reason about semantic drift between what the
+      assistant asserted and what you confirmed. Referent binding and
+      automatic divergence detection ship in a later phase; until then,
+      a "clean" report means <em>administratively</em> clean, not
+      <em>semantically</em> aligned.
+    </div>
+  `;
+
+  const partialNote = report.status === 'partial' ? `
+    <p>Coverage is <strong>${esc(report.coverage)}</strong>. ChatGPT
+    virtualizes long conversations — the extension may only have observed
+    the currently rendered section. Scroll through the full chat before
+    trusting a green result.</p>
+  ` : '';
+
+  const counts = `
+    <div class="report-counts" data-testid="report-counts">
+      <div><span class="n">${report.turnCount}</span> turns observed</div>
+      <div><span class="n">${report.confirmedCount}</span> confirmed</div>
+      <div><span class="n">${report.unresolvedCount}</span> unresolved</div>
+      <div><span class="n">${report.staleOpenCount}</span> stale</div>
+      <div><span class="n">${report.contestedCount}</span> contested</div>
+      <div><span class="n">${report.hedgedCount}</span> hedged</div>
+    </div>
+  `;
+
+  const findingsHtml = report.findings.length === 0 ? `
+    <div class="report-empty" data-testid="report-empty">
+      Nothing outstanding. Every observed commitment or assertion has been
+      resolved.
+    </div>
+  ` : report.findings.map(renderFinding).join('');
+
+  return `
+    <div class="report" data-testid="report">
+      <button class="report-back" data-testid="report-back-btn" aria-label="back to ledger">&lsaquo; back to ledger</button>
+      <div class="report-headline ${cls}" data-testid="report-headline">
+        <div class="report-status" data-testid="report-status">${esc(headline)}</div>
+        ${partialNote}
+      </div>
+      ${counts}
+      <div class="report-h5">Findings</div>
+      ${findingsHtml}
+      ${scopeNote}
+    </div>
+  `;
+}
+
+function renderFinding(f) {
+  const kindLabel = FINDING_LABELS[f.kind] || f.kind;
+  const ageLabel = f.ageInTurns === 0 ? 'this turn' : `${f.ageInTurns} turn${f.ageInTurns === 1 ? '' : 's'} ago`;
+  return `
+    <div class="finding" data-testid="finding" data-jump-target="${esc(f.sourceMessageId)}">
+      <div class="finding-meta">
+        <span class="finding-kind kind-${esc(f.kind)}">${esc(kindLabel)}</span>
+        <span class="finding-age">${esc(ageLabel)}</span>
+      </div>
+      <div class="finding-body">${esc(f.sentence)}${f.hedged ? '<span class="finding-hedge">(hedged)</span>' : ''}</div>
+    </div>
+  `;
 }
 
 // -----------------------------------------------------------------------------

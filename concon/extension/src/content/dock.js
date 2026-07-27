@@ -1,23 +1,26 @@
 // Dock controller — page reservation for the ConCon panel.
 //
-// v0.2 changes vs. v0.1:
-//   - Three responsive modes instead of two:
+// v0.3:
+//   - Two responsive modes (overlay dropped intentionally):
 //       wide     (>=1150px)   panel 340 / rail 48
-//       narrow   (700–1149px) panel 300 / rail 40  ← split-screen sweet spot
-//       overlay  (<700px)     panel floats, no reflow
+//       narrow   (<1150px)    panel 300 / rail 40
+//   - Reflow at every viewport width. The user decides how much space
+//     chat gets by collapsing/expanding the rail; the tool does not
+//     gate on our behalf. Curator Principle: don't decide *for* the
+//     user what's readable at their viewport.
 //   - Default state is COLLAPSED at every viewport width. Progressive
-//     disclosure: the rail is always visible ("I'm here"), expansion is
-//     a deliberate act.
+//     disclosure: the rail is always visible, expansion is deliberate.
 //   - Collapse preference persists per conversation via localStorage.
-//   - Reflow no longer assumes `main` is the width owner. We dynamically
-//     locate ChatGPT's conversation column by walking ancestors of the
-//     first turn and tag it with data-concon-target. The injected
-//     stylesheet targets [data-concon-target] AND body as a safety net.
-//   - A MutationObserver re-tags if React strips the attribute.
+//   - Reflow strategy: locate ChatGPT's `.w-screen` app shell and
+//     shrink it via CSS `width: calc(100vw - Xpx) !important`. Body
+//     padding-right has no effect on `.w-screen` because that shell is
+//     sized against the raw viewport, not its parent's box.
+//   - A MutationObserver re-tags the shell/container if React strips
+//     the attribute during a rerender.
 //
-// Public API unchanged: attachDock, detachDock, refreshDock, toggleCollapsed,
-// setCollapsed, isCollapsed, getMode, onLayoutChange, _resetDock.
-// New: setConversationId(id) — enables per-conversation persistence.
+// Public API: attachDock, detachDock, refreshDock, toggleCollapsed,
+// setCollapsed, isCollapsed, getMode, onLayoutChange, setConversationId,
+// _resetDock.
 
 import { selectors } from './selectors.js';
 
@@ -34,8 +37,8 @@ const SHELL_ATTR = 'data-concon-shell';
 const STORAGE_PREFIX = 'concon:collapsed:';
 
 const state = {
-  mode: 'overlay',           // wide | narrow | overlay
-  collapsed: true,           // b1: default collapsed everywhere
+  mode: 'narrow',            // wide | narrow
+  collapsed: true,           // default collapsed at every width
   conversationId: null,
   attached: false,
   container: null,
@@ -54,12 +57,12 @@ function loadPersistedCollapsed(convId) {
     const v = localStorage.getItem(persistedKey(convId));
     if (v === '1') return true;
     if (v === '0') return false;
-  } catch (_) {}
+  } catch (_) { /* noop */ }
   return true; // default collapsed
 }
 
 function savePersistedCollapsed(convId, val) {
-  try { localStorage.setItem(persistedKey(convId), val ? '1' : '0'); } catch (_) {}
+  try { localStorage.setItem(persistedKey(convId), val ? '1' : '0'); } catch (_) { /* noop */ }
 }
 
 // -------- container detection --------
@@ -75,7 +78,7 @@ function findFirstTurn() {
     try {
       const el = document.querySelector(sel);
       if (el) return el;
-    } catch (_) {}
+    } catch (_) { /* noop */ }
   }
   return null;
 }

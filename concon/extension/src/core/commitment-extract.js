@@ -21,7 +21,10 @@ const HUMAN_COMMIT_CUES = [
   /\bI['\u2019]m going to\b/i,
   /\bI['\u2019]ve decided\b/i,
   /\bI want to\b/i,
+  /\bI want\b/i,             // bare "I want X" (X may be a noun, not an infinitive)
+  /\bI['\u2019]d like\b/i,
   /\bI need to\b/i,
+  /\bI need\b/i,
   /\blet['\u2019]s\b/i,
   /\bwe should\b/i,
   /\bwe['\u2019]ll\b/i,
@@ -37,6 +40,8 @@ const HUMAN_IMPERATIVE_LEAD = new Set([
   'draft', 'refactor', 'rename', 'move', 'commit', 'push',
   'reduce', 'harden', 'expand', 'certify', 'publish', 'verify',
   'audit', 'gate', 'block', 'enforce', 'require', 'confirm',
+  'include', 'exclude', 'allow', 'disable', 'enable', 'retry',
+  'log', 'ignore', 'route', 'redirect', 'wrap',
 ]);
 
 // -------------------------------------------------------------------------
@@ -82,6 +87,21 @@ const HEDGE_CUES = [
   /\bpossibly\b/i,
   /\bmay\b/i,
   /\bsort of\b/i,
+  // Conditional hedges — "if X", "when possible", "as long as", "provided
+  // that", etc. Any of these downgrade an otherwise-firm commitment to
+  // conditional. Critical distinction: a real requirement stays firm, a
+  // conditional one carries its own escape clause.
+  /\bif\s+(technically\s+|reasonably\s+|actually\s+)?possible\b/i,
+  /\bif\s+it['\u2019]?s\s+possible\b/i,
+  /\bif\s+feasible\b/i,
+  /\bif\s+we\s+can\b/i,
+  /\bif\s+you\s+can\b/i,
+  /\bwhen\s+possible\b/i,
+  /\bwhere\s+possible\b/i,
+  /\bas\s+long\s+as\b/i,
+  /\bprovided\s+that\b/i,
+  /\bassuming\b/i,
+  /\bideally\b/i,
 ];
 
 // -------------------------------------------------------------------------
