@@ -160,3 +160,75 @@ export function formatStatusHeadline(report) {
   if (contestedCount > 0) bits.push(`${contestedCount} contested`);
   return `REVIEW — ${bits.join(' · ')}`;
 }
+
+// Serialize a Check report as portable Markdown. User-initiated only —
+// this exists to be pasted into a note, DM, tweet, or issue. Nothing is
+// sent by ConCon; the caller decides where the text goes.
+//
+// Doctrine constraints on the output:
+//   - Never state "aligned" / "no drift" / "verified".
+//   - Always include the coverage caveat when coverage !== 'full'.
+//   - Include the scope footer so downstream readers understand the tool
+//     is auditing recorded state, not detecting semantic drift.
+export function formatReportAsMarkdown(report, { url = null, timestamp = null } = {}) {
+  if (!report) return '';
+  const ts = timestamp || new Date().toISOString();
+  const headline = formatStatusHeadline(report);
+  const lines = [];
+
+  lines.push(`# ConCon Check — ${headline}`);
+  lines.push('');
+  if (url) lines.push(`Conversation: ${url}`);
+  lines.push(`Run at: ${ts}`);
+  lines.push(`Coverage: **${report.coverage}**${report.coverage !== 'full' ? ' — observation may be incomplete; scroll through the full chat before trusting a green result.' : ''}`);
+  lines.push('');
+
+  lines.push('## Counts');
+  lines.push(`- **${report.turnCount}** turns observed`);
+  lines.push(`- **${report.confirmedCount}** confirmed`);
+  lines.push(`- **${report.unresolvedCount}** unresolved`);
+  lines.push(`- **${report.staleOpenCount}** stale (5+ turns without resolution)`);
+  lines.push(`- **${report.contestedCount}** contested`);
+  lines.push(`- **${report.hedgedCount}** hedged`);
+  lines.push('');
+
+  if (report.findings.length === 0) {
+    lines.push('## Findings');
+    lines.push('');
+    lines.push('Nothing outstanding. Every observed commitment or assertion has been resolved.');
+  } else {
+    // Group findings by kind for readability.
+    const byKind = new Map();
+    for (const f of report.findings) {
+      if (!byKind.has(f.kind)) byKind.set(f.kind, []);
+      byKind.get(f.kind).push(f);
+    }
+    const kindOrder = ['stale-open', 'contested', 'unresolved-human', 'unresolved-assistant'];
+    const kindLabels = {
+      'stale-open':            'Stale (unresolved for 5+ turns)',
+      'contested':             'Contested',
+      'unresolved-human':      'Your proposals awaiting your ratification',
+      'unresolved-assistant':  'Assistant assertions awaiting your response',
+    };
+    lines.push('## Findings');
+    lines.push('');
+    for (const kind of kindOrder) {
+      const items = byKind.get(kind);
+      if (!items || items.length === 0) continue;
+      lines.push(`### ${kindLabels[kind] || kind}`);
+      lines.push('');
+      for (const f of items) {
+        const age = f.ageInTurns === 0 ? 'this turn' : `${f.ageInTurns} turn${f.ageInTurns === 1 ? '' : 's'} ago`;
+        lines.push(`- ${f.hedged ? '_(hedged)_ ' : ''}"${f.sentence}"`);
+        lines.push(`  — role: ${f.role || 'unknown'}, age: ${age}`);
+      }
+      lines.push('');
+    }
+  }
+
+  lines.push('---');
+  lines.push('_ConCon audits recorded conversation state. This is not yet a semantic drift detector — it reports what the ledger already knows._');
+  lines.push('_Local · offline · no telemetry. https://github.com — link your repo here._');
+
+  return lines.join('\n');
+}

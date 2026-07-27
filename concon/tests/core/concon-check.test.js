@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runCheck, formatStatusHeadline } from '../../extension/src/core/concon-check.js';
+import { runCheck, formatStatusHeadline, formatReportAsMarkdown } from '../../extension/src/core/concon-check.js';
 import { updateLedger, transitionEntry } from '../../extension/src/core/ledger.js';
 
 function msg({ id, order, role, text }) {
@@ -98,3 +98,62 @@ test('formatStatusHeadline never claims semantic alignment', () => {
   assert.match(partialHeadline, /partial/i);
   assert.match(partialHeadline, /unknown/i);
 });
+
+// -------------------- formatReportAsMarkdown --------------------
+
+test('formatReportAsMarkdown produces a shareable, doctrine-compliant document', () => {
+  const messages = [
+    msg({ id: 'a', order: 1, role: 'user', text: "I want Facebook included if technically possible." }),
+    msg({ id: 'b', order: 2, role: 'assistant', text: "The plan is to add caching next." }),
+  ];
+  const ledger = buildLedgerFrom(messages);
+  const report = runCheck({ messages, ledger, coverage: 'unknown' });
+  const md = formatReportAsMarkdown(report, {
+    url: 'https://chatgpt.com/c/example',
+    timestamp: '2026-07-27T12:00:00.000Z',
+  });
+
+  // Structural markers.
+  assert.match(md, /^# ConCon Check —/m, 'has an H1 headline');
+  assert.match(md, /## Counts/, 'has a counts section');
+  assert.match(md, /## Findings/, 'has a findings section');
+  assert.match(md, /Coverage: \*\*unknown\*\*/, 'discloses coverage honestly');
+  assert.match(md, /observation may be incomplete/i, 'notes partial-coverage caveat');
+  assert.match(md, /2\*\*\ turns observed|2\*\* turns observed/, 'includes turn count');
+  assert.match(md, /Run at: 2026-07-27T12:00:00.000Z/, 'includes timestamp');
+  assert.match(md, /Conversation: https:\/\/chatgpt\.com\/c\/example/, 'includes conversation URL when provided');
+
+  // Doctrine: never claim alignment / no drift / verified truth.
+  assert.doesNotMatch(md, /aligned/i);
+  assert.doesNotMatch(md, /no drift/i);
+  assert.doesNotMatch(md, /verified/i);
+
+  // Doctrine: scope footer.
+  assert.match(md, /not yet a semantic drift detector/i);
+  assert.match(md, /Local · offline · no telemetry/i);
+});
+
+test('formatReportAsMarkdown omits URL line when none provided', () => {
+  const report = runCheck({ messages: [], ledger: null, coverage: 'unknown' });
+  const md = formatReportAsMarkdown(report);
+  assert.doesNotMatch(md, /^Conversation: /m);
+});
+
+test('formatReportAsMarkdown handles empty-findings state cleanly', () => {
+  const messages = [msg({ id: 'a', order: 1, role: 'user', text: "I will ship it." })];
+  let ledger = buildLedgerFrom(messages);
+  ledger = transitionEntry(ledger, ledger.entries[0].id, 'confirmed');
+  const report = runCheck({ messages, ledger, coverage: 'full' });
+  const md = formatReportAsMarkdown(report);
+  assert.match(md, /Nothing outstanding\./);
+  assert.match(md, /clean/i);
+});
+
+test('formatReportAsMarkdown escapes hedged findings as (hedged)', () => {
+  const messages = [msg({ id: 'a', order: 1, role: 'user', text: "I want Facebook if feasible." })];
+  const ledger = buildLedgerFrom(messages);
+  const report = runCheck({ messages, ledger, coverage: 'unknown' });
+  const md = formatReportAsMarkdown(report);
+  assert.match(md, /_\(hedged\)_/);
+});
+

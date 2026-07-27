@@ -14,7 +14,7 @@
 
 import { groupByTopic } from '../core/ledger.js';
 import { searchLedger, countTranscriptOnly, highlightMatch } from '../core/search.js';
-import { runCheck, formatStatusHeadline } from '../core/concon-check.js';
+import { runCheck, formatStatusHeadline, formatReportAsMarkdown } from '../core/concon-check.js';
 
 const STYLE = `
   :host { all: initial; }
@@ -393,6 +393,13 @@ const STYLE = `
   .report {
     padding: 4px 4px 14px;
   }
+  .report-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
   .report-back {
     all: unset;
     display: inline-flex;
@@ -406,9 +413,27 @@ const STYLE = `
     color: #7a715f;
     cursor: pointer;
     border-radius: 4px;
-    margin-bottom: 10px;
   }
   .report-back:hover { color: #1c1a17; background: #ebe5d3; }
+  .report-share {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f6f2ea;
+    background: #1c1a17;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .report-share:hover { background: #3a342a; }
+  .report-share.copied { background: #7a8f5a; }
+  .report-share.copied::after { content: ' ✓'; }
   .report-headline {
     padding: 12px 14px;
     border-radius: 4px;
@@ -892,6 +917,24 @@ export function renderPanel(shadowRoot, callbacks = {}) {
       if (callbacks.onCloseCheck) callbacks.onCloseCheck();
       return;
     }
+    // Report "share" button — copy the current report as Markdown.
+    // User-initiated. Nothing leaves the device except via the user's
+    // own paste action. Doctrine intact.
+    const shareBtn = ev.target.closest('[data-testid="report-share-btn"]');
+    if (shareBtn) {
+      const md = formatReportAsMarkdown(lastReport, {
+        url: (typeof location !== 'undefined' && location.href) || null,
+      });
+      copyToClipboard(md).then((ok) => {
+        shareBtn.classList.add('copied');
+        shareBtn.textContent = ok ? 'copied' : 'copy failed';
+        setTimeout(() => {
+          shareBtn.classList.remove('copied');
+          shareBtn.textContent = 'share';
+        }, 1600);
+      });
+      return;
+    }
     const actionBtn = ev.target.closest('button[data-action]');
     if (actionBtn) {
       const entryId = actionBtn.getAttribute('data-entry-id');
@@ -918,6 +961,9 @@ export function renderPanel(shadowRoot, callbacks = {}) {
 // store event and we want the report to persist across those renders
 // until the user explicitly returns to the ledger.
 let reportOpen = false;
+// The most recent report object, kept so the share button can serialise
+// it without re-running the check.
+let lastReport = null;
 
 export function isReportOpen() { return reportOpen; }
 
@@ -992,6 +1038,7 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
       // until we build proper coverage detection.
       coverage: 'unknown',
     });
+    lastReport = report;
     body.innerHTML = renderReport(report);
     return;
   }
@@ -1176,7 +1223,10 @@ function renderReport(report) {
 
   return `
     <div class="report" data-testid="report">
-      <button class="report-back" data-testid="report-back-btn" aria-label="back to ledger">&lsaquo; back to ledger</button>
+      <div class="report-topbar">
+        <button class="report-back" data-testid="report-back-btn" aria-label="back to ledger">&lsaquo; back to ledger</button>
+        <button class="report-share" data-testid="report-share-btn" aria-label="copy report as markdown" title="copy report as markdown">share</button>
+      </div>
       <div class="report-headline ${cls}" data-testid="report-headline">
         <div class="report-status" data-testid="report-status">${esc(headline)}</div>
         ${partialNote}
@@ -1201,6 +1251,34 @@ function renderFinding(f) {
       <div class="finding-body">${esc(f.sentence)}${f.hedged ? '<span class="finding-hedge">(hedged)</span>' : ''}</div>
     </div>
   `;
+}
+
+// Clipboard writer with a textarea fallback for contexts where the async
+// Clipboard API is blocked (e.g. certain shadow-DOM/focus edge cases).
+// Everything happens in the page's own process — nothing crosses to
+// ConCon; there is no ConCon endpoint to cross to.
+async function copyToClipboard(text) {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand && document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 // -----------------------------------------------------------------------------
