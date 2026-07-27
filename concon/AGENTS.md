@@ -100,19 +100,32 @@ and legal-adjacent drafting cannot share one threshold. ConCon exposes
 three named modes (never a raw slider — users don't know where to put a
 number), stored per-conversation:
 
-- **Explicit only.** Ledger records commitments with clear illocutionary
-  force ("I will X", "we agreed X"). Ignores hedges. Ignores referents.
-  Silent unless the assistant asserts something the human explicitly said.
-- **Balanced (default).** Current heuristics. Moderate confidence floor.
-  Referent ambiguity surfaced when it crosses threshold.
+- **Trust.** Only firm commitments are extracted ("I will X", "confirmed:
+  Y", "we agreed X"). Extracted entries are **auto-confirmed** — the
+  user's *choice of Trust mode* is itself the meta-ratification. The tool
+  runs quietly in the background; recently added entries are visually
+  flagged for a few seconds so the user can eyeball them, but no tap is
+  required. The user can still contest any entry after the fact — the
+  pressure-release valve stays open.
+- **Balanced (default).** Current heuristics — commitments plus
+  moderate-confidence assertions and hedged statements. High-confidence
+  firm entries auto-confirm; hedged or ambiguous entries stay proposed
+  and wait for a tap.
 - **Wary.** Everything above, plus proactive divergence pings when the
   assistant asserts "as you mentioned" / "you agreed" and the referenced
-  content is not in the confirmed set. Wary is the human's declaration
-  that this conversation matters and interruption is preferable to drift.
+  content is not in the confirmed set. **Every entry** requires manual
+  ratification. This is the mode for high-stakes work where the friction
+  is the point.
 
-Vigilance is the human side of the Curator Principle. The user still
-ratifies every entry; vigilance only shapes what gets proposed for
-ratification.
+Vigilance is the human side of the Curator Principle. The user's choice
+of vigilance IS a form of ratification — it's the meta-consent that
+tells the tool how much tapping is warranted. Silence in Trust mode is
+not tool overreach; it is a user preference the user set. The Curator
+Principle holds: *the human ratifies*, but the *form* ratification takes
+scales with the user's own declared appetite for scrutiny.
+
+Contest is always available at every vigilance level. Auto-confirm is
+default-accept-with-easy-undo, never auto-lock.
 
 ## Current scope
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ConCon",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Bridge the human/LLM communication gap. Local, offline, no telemetry.",
   "host_permissions": ["https://chatgpt.com/*"],
   "permissions": ["storage"],

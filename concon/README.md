@@ -151,7 +151,7 @@ Full roadmap in [`docs/ROADMAP.md`](docs/ROADMAP.md). Immediate priorities:
 - **v0.x — free, MIT-licensed, open source.** Optimize for spread.
 - **v1.0 — two tiers.**
   - Free forever: current session ledger, heuristic extractor, ConCon
-    Check, Explicit + Balanced vigilance modes.
+    Check, Trust + Balanced vigilance modes.
   - Pro ($6/mo or $48/yr, $79 lifetime): cross-conversation memory,
     local model runtime, Wary vigilance, exports, and the ongoing service
     of keeping selectors current when ChatGPT changes its DOM.

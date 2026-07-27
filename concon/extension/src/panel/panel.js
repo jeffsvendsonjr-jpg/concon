@@ -452,6 +452,14 @@ const STYLE = `
     color: #1c1a17;
     font-weight: 600;
   }
+  .report-timestamp {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    color: #7a715f;
+    margin-top: 4px;
+  }
   .report-headline p {
     margin: 6px 0 0 0;
     font-size: 12px;
@@ -1184,6 +1192,14 @@ const FINDING_LABELS = {
 function renderReport(report) {
   const headline = formatStatusHeadline(report);
   const cls = `status-${report.status}`;
+  // Local-time timestamp for the on-screen header. Formatted long-form so
+  // it reads cleanly in screenshots. The Markdown export uses ISO-8601
+  // separately for cross-timezone portability.
+  const now = new Date();
+  const timeLabel = now.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
 
   const scopeNote = `
     <div class="report-scope-note" data-testid="report-scope-note">
@@ -1229,6 +1245,7 @@ function renderReport(report) {
       </div>
       <div class="report-headline ${cls}" data-testid="report-headline">
         <div class="report-status" data-testid="report-status">${esc(headline)}</div>
+        <div class="report-timestamp" data-testid="report-timestamp">run at ${esc(timeLabel)}</div>
         ${partialNote}
       </div>
       ${counts}

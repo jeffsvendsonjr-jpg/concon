@@ -63,7 +63,7 @@ settle X?" — ConCon Check answers it in one tap.
   Rendering: 3px stripe on the turn's left edge + small dot in the
   top-left corner; hover-tooltip explains the signal. Never mutates
   ChatGPT's text — added-adjacent only.
-- **Vigilance-gated:** Explicit → no markers. Balanced → high-confidence
+- **Vigilance-gated:** Trust → no markers. Balanced → high-confidence
   rogue-begin + contested-basis only. Wary → all four types + proactive
   toast pings in the panel when a new divergence fires.
 - Divergence flags also appear in the panel next to the source turn and
@@ -78,7 +78,7 @@ in Step 5.5 with entailment scoring. Accuracy jumps from ~80% to ~95%.
 
 ### Vigilance modes UI · **P1**
 
-Three-mode toggle in the panel header (Explicit / Balanced / Wary).
+Three-mode toggle in the panel header (Trust / Balanced / Wary).
 Per-conversation persistence, same pattern as collapse state.
 
 ### Persistent cross-conversation memory · **P1** (paid tier)
@@ -106,7 +106,7 @@ Every user is a distribution channel.
 ### v1.0 — dual tier
 
 - **Free forever:** single-conversation session ledger, heuristic
-  extractor, ConCon Check (heuristic), Explicit + Balanced vigilance.
+  extractor, ConCon Check (heuristic), Trust + Balanced vigilance.
   Never crippled.
 - **Pro $6/mo or $48/yr:** cross-conversation memory, local model runtime,
   Wary vigilance, exports, keyboard shortcuts, and the ongoing service of
