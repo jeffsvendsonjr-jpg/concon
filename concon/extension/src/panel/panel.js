@@ -258,6 +258,119 @@ const STYLE = `
     background: rgba(255, 253, 248, 0.6);
   }
   .empty strong { font-weight: 600; color: #1c1a17; }
+  .empty p { margin: 0 0 10px 0; }
+  .empty p:last-child { margin-bottom: 0; }
+  .empty ul { margin: 6px 0 10px 0; padding-left: 18px; }
+  .empty li { margin: 4px 0; }
+  .empty .k {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: #1c1a17;
+    background: #ebe5d3;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  /* --- Help overlay: opens on ? click. Dismisses on click outside, Esc,
+     or "close" button. First-run version has slightly different copy. */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(28, 26, 23, 0.32);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 14px 14px;
+    z-index: 10;
+  }
+  .overlay.visible { display: flex; }
+  .overlay-card {
+    background: #f6f2ea;
+    border: 1px solid #d9d1c0;
+    border-radius: 6px;
+    padding: 18px 20px 16px;
+    max-width: 100%;
+    width: 100%;
+    box-shadow: 0 12px 32px rgba(28, 26, 23, 0.22);
+    font-size: 13px;
+    line-height: 1.55;
+    color: #1c1a17;
+    max-height: calc(100% - 20px);
+    overflow-y: auto;
+  }
+  .overlay-card h4 {
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    text-shadow: 0 1px 0 rgba(255, 253, 248, 0.85);
+  }
+  .overlay-card h5 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a715f;
+    margin: 14px 0 4px 0;
+  }
+  .overlay-card p { margin: 0 0 8px 0; }
+  .overlay-card ul { margin: 4px 0 8px 0; padding-left: 16px; }
+  .overlay-card li { margin: 3px 0; }
+  .overlay-card li strong { color: #1c1a17; font-weight: 600; }
+  .overlay-card .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .overlay-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .overlay-btn {
+    all: unset;
+    padding: 6px 14px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f6f2ea;
+    background: #1c1a17;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .overlay-btn:hover { background: #3a342a; }
+  .help-btn {
+    all: unset;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 999px;
+    border: 1px solid #d9d1c0;
+    color: #7a715f;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .help-btn:hover { background: #ebe5d3; color: #1c1a17; border-color: #b0632d; }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  /* Hide the view toggle until it's meaningful (2+ topics AND some entries). */
+  .view-toggle.hidden { display: none; }
   .topic-header {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 10px;
@@ -462,9 +575,11 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     <div class="header">
       <div class="header-titles">
         <span class="brand" data-testid="concon-brand">ConCon<span class="brand-dot">.</span></span>
-        <span class="tag" data-testid="concon-phase">v0.1 · ledger</span>
       </div>
-      <button class="collapse-toggle" data-testid="collapse-toggle" title="collapse panel" aria-label="collapse panel">&rsaquo;</button>
+      <div class="header-actions">
+        <button class="help-btn" data-testid="help-btn" title="what is this?" aria-label="what is this?">?</button>
+        <button class="collapse-toggle" data-testid="collapse-toggle" title="collapse panel" aria-label="collapse panel">&rsaquo;</button>
+      </div>
     </div>
     <div class="rail" data-testid="concon-rail">
       <button class="collapse-toggle" data-testid="expand-toggle" title="expand panel" aria-label="expand panel">&lsaquo;</button>
@@ -476,10 +591,9 @@ export function renderPanel(shadowRoot, callbacks = {}) {
       <div class="toolbar-row">
         <div class="status" data-testid="concon-status">
           <span class="count" data-testid="turn-count">0</span> turns ·
-          <span class="count" data-testid="topic-count">0</span> topics ·
-          <span class="count" data-testid="entry-count">0</span> ledger
+          <span class="count" data-testid="entry-count">0</span> in ledger<span class="topic-suffix" data-testid="topic-suffix" style="display:none"> · <span class="count" data-testid="topic-count">0</span> topics</span>
         </div>
-        <div class="view-toggle" data-testid="view-toggle" role="tablist">
+        <div class="view-toggle hidden" data-testid="view-toggle" role="tablist">
           <button data-view="chronological" class="active" data-testid="view-chronological-btn">chrono</button>
           <button data-view="topic" data-testid="view-topic-btn">topic</button>
         </div>
@@ -499,10 +613,34 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     </div>
     <div class="body" data-testid="ledger-body">
       <div class="empty" data-testid="ledger-empty">
-        <strong>Ledger is live.</strong> As commitments and assertions are
-        detected in this conversation, they will appear here. Each entry
-        starts as inferred and requires an explicit gesture to become part
-        of shared state. Nothing consequential silently merges.
+        <p><strong>Watching this conversation for drift.</strong></p>
+        <p>When you or ChatGPT commit to something, it lands here as a proposed entry. You decide what actually counts:</p>
+        <ul>
+          <li><strong>Confirm</strong> — lock it into the shared record.</li>
+          <li><strong>Contest</strong> — flag it as wrong or unwanted.</li>
+        </ul>
+        <p>Nothing gets saved unless you say so. Tap the <span class="k">?</span> above for more.</p>
+      </div>
+    </div>
+    <div class="overlay" data-testid="help-overlay">
+      <div class="overlay-card">
+        <h4 data-testid="help-title">What ConCon does</h4>
+        <p>ConCon is a ledger of what you and ChatGPT have actually agreed to in this conversation. It reads each turn as it appears and pulls out commitment-shaped statements. You decide what counts.</p>
+
+        <h5>Four concepts</h5>
+        <ul>
+          <li><strong>Commitment</strong> — something you or the assistant said would happen. "I'll ship it Friday." "Add retry logic."</li>
+          <li><strong>Confirm</strong> — you lock it into the shared record. The assistant can rely on it in later turns.</li>
+          <li><strong>Contest</strong> — you flag it as wrong or unwanted. The record shows the disagreement.</li>
+          <li><strong>Drift</strong> — the assistant assumes something you never confirmed. Coming soon: colored markers on the chat itself so you can spot it while scrolling.</li>
+        </ul>
+
+        <h5>What stays on your device</h5>
+        <p>Everything. No accounts, no telemetry, no external APIs. Your conversation is never sent anywhere. Close the tab and the ledger is gone.</p>
+
+        <div class="overlay-actions">
+          <button class="overlay-btn" data-testid="help-close-btn">got it</button>
+        </div>
       </div>
     </div>
     <div class="footer" data-testid="concon-footer">local · offline · no telemetry</div>
@@ -517,6 +655,48 @@ export function renderPanel(shadowRoot, callbacks = {}) {
   const expandBtn = root.querySelector('[data-testid="expand-toggle"]');
   if (collapseBtn) collapseBtn.addEventListener('click', collapseHandler);
   if (expandBtn) expandBtn.addEventListener('click', collapseHandler);
+
+  // Wire the help overlay. First-run: show once per install with a
+  // slightly different title. Subsequent opens use the ? button.
+  const overlay = root.querySelector('[data-testid="help-overlay"]');
+  const helpBtn = root.querySelector('[data-testid="help-btn"]');
+  const helpClose = root.querySelector('[data-testid="help-close-btn"]');
+  const helpTitle = root.querySelector('[data-testid="help-title"]');
+  const openHelp = (firstRun = false) => {
+    if (!overlay) return;
+    if (helpTitle) {
+      helpTitle.textContent = firstRun ? 'Welcome to ConCon' : 'What ConCon does';
+    }
+    overlay.classList.add('visible');
+  };
+  const closeHelp = () => {
+    if (overlay) overlay.classList.remove('visible');
+  };
+  if (helpBtn) helpBtn.addEventListener('click', () => openHelp(false));
+  if (helpClose) helpClose.addEventListener('click', () => {
+    closeHelp();
+    try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
+  });
+  if (overlay) overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) {
+      closeHelp();
+      try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
+    }
+  });
+  // Escape closes the overlay from anywhere in the shadow root.
+  root.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && overlay?.classList.contains('visible')) {
+      closeHelp();
+      try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
+    }
+  });
+  // First run: fire once per browser install.
+  try {
+    if (!localStorage.getItem('concon:ftu-seen')) {
+      // Delay slightly so the panel visually settles first.
+      setTimeout(() => openHelp(true), 400);
+    }
+  } catch (_) { /* noop */ }
 
   // Wire the view-mode toggle.
   const toggleEl = root.querySelector('[data-testid="view-toggle"]');
@@ -596,6 +776,14 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
   if (p) p.textContent = String(topicCount);
   if (e) e.textContent = String(entryCount);
 
+  // Topic-count suffix appears only once there are 2+ topics; before that
+  // the counter is noise. Same for the view toggle — no point offering
+  // "chrono / topic" until there's actual topic diversity to organise.
+  const topicSuffix = shadowRoot.querySelector('[data-testid="topic-suffix"]');
+  if (topicSuffix) topicSuffix.style.display = topicCount >= 2 ? '' : 'none';
+  const viewToggle = shadowRoot.querySelector('[data-testid="view-toggle"]');
+  if (viewToggle) viewToggle.classList.toggle('hidden', !(entryCount > 0 && topicCount >= 2));
+
   // View toggle visual state.
   for (const btn of shadowRoot.querySelectorAll('[data-testid="view-toggle"] button')) {
     btn.classList.toggle('active', btn.getAttribute('data-view') === viewMode);
@@ -624,10 +812,13 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
   if (!ledger || ledger.entries.length === 0) {
     body.innerHTML = `
       <div class="empty" data-testid="ledger-empty">
-        <strong>Ledger is live.</strong> As commitments and assertions are
-        detected in this conversation, they will appear here. Each entry
-        starts as inferred and requires an explicit gesture to become part
-        of shared state. Nothing consequential silently merges.
+        <p><strong>Watching this conversation for drift.</strong></p>
+        <p>When you or ChatGPT commit to something, it lands here as a proposed entry. You decide what actually counts:</p>
+        <ul>
+          <li><strong>Confirm</strong> — lock it into the shared record.</li>
+          <li><strong>Contest</strong> — flag it as wrong or unwanted.</li>
+        </ul>
+        <p>Nothing gets saved unless you say so. Tap the <span class="k">?</span> above for more.</p>
       </div>
     `;
     return;
@@ -641,9 +832,8 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
   if (hasSearch && visibleEntries.length === 0) {
     body.innerHTML = `
       <div class="empty" data-testid="ledger-empty-search">
-        No ledger entries match this search. Any transcript matches are
-        counted in the badge above; the ledger only contains
-        commitment-shaped statements, so plain mentions live outside it.
+        <p>No ledger entries match this search.</p>
+        <p>The counter above shows how many plain mentions appear in the transcript. Those live outside the ledger — the ledger only holds commitment-shaped statements.</p>
       </div>
     `;
     return;
