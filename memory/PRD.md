@@ -1,9 +1,13 @@
 # ConCon — Product Requirements Document
 
-**Status:** v0.2.0 shipped — three-mode responsive dock, default collapsed
-everywhere, per-conversation collapse persistence, dynamic container
-detection. Live-ChatGPT reflow verification pending (user testing on
-split-screen setup).
+**Status:** v0.3.1 shipped — external code review from ChatGPT applied.
+Fixed P0 ledger restoration bug (data was silently lost after refresh),
+corrected the privacy copy to accurately describe IndexedDB persistence,
+extended the extractor for bare "I want" and conditional hedges, and
+shipped ConCon Check v0 as a deterministic state-integrity audit
+(honest-scope: not a semantic drift detector — that ships with Step 6+).
+70/70 unit tests pass. Testing agent verified all fixes on
+2026-07-27.
 
 ## Original problem statement
 
