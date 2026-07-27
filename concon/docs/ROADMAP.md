@@ -141,3 +141,24 @@ Do not design for iOS until Chrome has validated the mental model. Keep
 - Local models propose; they never confirm.
 - Vigilance controls proposal rate, never ratification threshold.
 - ConCon Check stays user-initiated; proactive lives in Wary vigilance.
+
+## Scope claim (what ConCon does and does not eliminate)
+
+ConCon eliminates **drift-class hallucinations** — the class of model
+failure in which the assistant misremembers, mis-attributes, or invents
+content about the human it's talking to. Conversational bookkeeping is
+sufficient to catch these because everything ConCon needs is contained
+in the conversation itself. This is why the "all data stays local"
+doctrine is even possible.
+
+ConCon does **not** eliminate **world-class hallucinations** — the class
+of model failure in which the assistant is wrong about facts, citations,
+code APIs, or anything external to the conversation. Catching those
+requires ground truth beyond what the user typed, which requires
+external APIs / retrieval / verification, which violates the doctrine.
+Different problem, different tool.
+
+Marketing must never claim ConCon "eliminates hallucinations" without
+this qualifier. The honest pitch is: "ConCon eliminates the class of
+hallucination the model produces about you — not the class it produces
+about the world. We chose the problem that respects your privacy."
