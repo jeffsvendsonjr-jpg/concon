@@ -134,6 +134,33 @@ Everything in `extension/src/core/` is runtime-agnostic and portable.
 Do not design for iOS until Chrome has validated the mental model. Keep
 `core/` chrome-free so path 1/2 remain cheap.
 
+## Voice conversations — roadmap
+
+ChatGPT voice usage has three modes, with three different current outcomes:
+
+- **Voice-to-text input** (mic → transcribe → send): works today, no changes needed.
+- **Read-aloud output** (assistant response spoken): works today, DOM has the text.
+- **Advanced Voice Mode** (real-time voice conversation): currently invisible
+  to ConCon. No text turns rendered → nothing to observe → ledger stays empty
+  during voice sessions. This is a real gap because voice is exactly where
+  drift is worst (can't scroll back audio; speech is less precise; quick
+  vocal acknowledgments pattern-match to confirmation but often aren't).
+
+Paths forward:
+
+a. **Piggyback on ChatGPT's transcript view** (if surfaced). Zero-cost if
+   available. First thing to check when returning to this.
+b. **Bundled local Whisper via transformers.js WASM.** Adds ~40–200MB to
+   the extension bundle but keeps doctrine intact. Also unlocks the iOS
+   companion app's voice ingest (same problem, same solution via Core ML).
+c. **Web Speech API** — rejected. Chrome's implementation uses Google
+   Cloud for recognition. Doctrine violation.
+
+Priority: **P2 for Chrome (path b behind Steps 6–8), P0 for the iOS
+companion app** when that path activates. The voice observation problem
+and the iOS-native problem share a solution, which is a strong signal
+that path b becomes the correct investment before the iOS companion.
+
 ## Doctrine invariants (never violate)
 
 - No backend, no accounts, no telemetry, no external AI API.
