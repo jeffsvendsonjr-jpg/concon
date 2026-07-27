@@ -15,6 +15,7 @@
 import { groupByTopic } from '../core/ledger.js';
 import { searchLedger, countTranscriptOnly, highlightMatch } from '../core/search.js';
 import { runCheck, formatStatusHeadline, formatReportAsMarkdown } from '../core/concon-check.js';
+import { getEffectiveVigilance, setConversationVigilance, setGlobalVigilance, hasPickedFTU, markFTUPicked, MODES as VIGILANCE_MODES } from '../core/vigilance.js';
 
 const STYLE = `
   :host { all: initial; }
@@ -318,6 +319,48 @@ const STYLE = `
   .overlay-card ul { margin: 4px 0 8px 0; padding-left: 16px; }
   .overlay-card li { margin: 3px 0; }
   .overlay-card li strong { color: #1c1a17; font-weight: 600; }
+  /* Vigilance picker — three tap-able cards inside the overlay. */
+  .mode-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0 4px;
+  }
+  .mode-option {
+    all: unset;
+    display: block;
+    padding: 10px 12px;
+    border: 1px solid #d9d1c0;
+    border-radius: 4px;
+    background: #fbfaf7;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .mode-option:hover { background: #f2ecdd; }
+  .mode-option.selected {
+    border-color: #b0632d;
+    background: #faedde;
+  }
+  .mode-option-title {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #1c1a17;
+    margin-bottom: 3px;
+  }
+  .mode-option-desc {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #4a453b;
+  }
+  .overlay-card .mode-hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #7a715f;
+    font-style: italic;
+  }
   .overlay-card .dot {
     display: inline-block;
     width: 8px;
@@ -364,6 +407,29 @@ const STYLE = `
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   .help-btn:hover { background: #ebe5d3; color: #1c1a17; border-color: #b0632d; }
+  /* Vigilance mode chip in header. Always visible so the current mode
+     is never a hidden setting. Colour-coded by mode. */
+  .mode-chip {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 999px;
+    border: 1px solid #d9d1c0;
+    color: #4a453b;
+    background: #fbfaf7;
+    flex-shrink: 0;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .mode-chip:hover { background: #ebe5d3; }
+  .mode-chip[data-mode="trust"]    { color: #4a453b; border-color: #c9bfa9; background: #f2ecdd; }
+  .mode-chip[data-mode="balanced"] { color: #4a453b; border-color: #b0632d; background: #faedde; }
+  .mode-chip[data-mode="wary"]     { color: #f6f2ea; border-color: #a13a2b; background: #a13a2b; }
   .header-actions {
     display: flex;
     align-items: center;
@@ -759,6 +825,9 @@ export function renderPanel(shadowRoot, callbacks = {}) {
         <span class="brand" data-testid="concon-brand">ConCon<span class="brand-dot">.</span></span>
       </div>
       <div class="header-actions">
+        <button class="mode-chip" data-testid="mode-chip" title="vigilance mode — tap to change" aria-label="vigilance mode">
+          <span class="mode-chip-label" data-testid="mode-chip-label">balanced</span>
+        </button>
         <button class="help-btn" data-testid="help-btn" title="what is this?" aria-label="what is this?">?</button>
         <button class="collapse-toggle" data-testid="collapse-toggle" title="collapse panel" aria-label="collapse panel">&rsaquo;</button>
       </div>
@@ -806,24 +875,8 @@ export function renderPanel(shadowRoot, callbacks = {}) {
       </div>
     </div>
     <div class="overlay" data-testid="help-overlay">
-      <div class="overlay-card">
-        <h4 data-testid="help-title">What ConCon does</h4>
-        <p>ConCon is a ledger of what you and ChatGPT have actually agreed to in this conversation. It reads each turn as it appears and pulls out commitment-shaped statements. You decide what counts.</p>
-
-        <h5>Four concepts</h5>
-        <ul>
-          <li><strong>Commitment</strong> — something you or the assistant said would happen. "I'll ship it Friday." "Add retry logic."</li>
-          <li><strong>Confirm</strong> — you lock it into the shared record. The assistant can rely on it in later turns.</li>
-          <li><strong>Contest</strong> — you flag it as wrong or unwanted. The record shows the disagreement.</li>
-          <li><strong>Drift</strong> — the assistant assumes something you never confirmed. Coming soon: colored markers on the chat itself so you can spot it while scrolling.</li>
-        </ul>
-
-        <h5>Where your data lives</h5>
-        <p>On this device only. ConCon stores observed turns and your ledger in your browser (IndexedDB) so both survive a refresh. Nothing is sent to ConCon, OpenAI, or any external service. There are no accounts, no telemetry, no API calls. To wipe everything, clear the extension's site data or uninstall it.</p>
-
-        <div class="overlay-actions">
-          <button class="overlay-btn" data-testid="help-close-btn">got it</button>
-        </div>
+      <div class="overlay-card" data-testid="overlay-card">
+        <!-- Content is written by openHelp() / openModePicker(). -->
       </div>
     </div>
     <div class="footer" data-testid="concon-footer">local · offline · no telemetry</div>
@@ -839,47 +892,103 @@ export function renderPanel(shadowRoot, callbacks = {}) {
   if (collapseBtn) collapseBtn.addEventListener('click', collapseHandler);
   if (expandBtn) expandBtn.addEventListener('click', collapseHandler);
 
-  // Wire the help overlay. First-run: show once per install with a
-  // slightly different title. Subsequent opens use the ? button.
+  // Overlay controller. Two content modes:
+  //   'help'    — the four-concept explainer + privacy blurb + "got it".
+  //   'picker'  — mandatory vigilance mode selection. Cannot be dismissed
+  //               without picking; there is no × or backdrop-close.
   const overlay = root.querySelector('[data-testid="help-overlay"]');
+  const overlayCard = root.querySelector('[data-testid="overlay-card"]');
   const helpBtn = root.querySelector('[data-testid="help-btn"]');
-  const helpClose = root.querySelector('[data-testid="help-close-btn"]');
-  const helpTitle = root.querySelector('[data-testid="help-title"]');
-  const openHelp = (firstRun = false) => {
-    if (!overlay) return;
-    if (helpTitle) {
-      helpTitle.textContent = firstRun ? 'Welcome to ConCon' : 'What ConCon does';
-    }
-    overlay.classList.add('visible');
+  const modeChip = root.querySelector('[data-testid="mode-chip"]');
+  const modeChipLabel = root.querySelector('[data-testid="mode-chip-label"]');
+
+  // The panel has a getCurrentConversationId() callback so it knows which
+  // conversation to save a per-conversation vigilance override to.
+  const getConvId = () => (callbacks.getConversationId?.() || null);
+
+  const setChipTo = (mode) => {
+    if (modeChip) modeChip.setAttribute('data-mode', mode);
+    if (modeChipLabel) modeChipLabel.textContent = mode;
   };
-  const closeHelp = () => {
+
+  const openHelp = () => {
+    if (!overlay || !overlayCard) return;
+    overlayCard.innerHTML = HELP_HTML;
+    overlay.classList.add('visible');
+    overlay.setAttribute('data-mode', 'help');
+  };
+
+  const openModePicker = ({ mandatory = false, firstRun = false } = {}) => {
+    if (!overlay || !overlayCard) return;
+    const currentMode = getEffectiveVigilance(getConvId());
+    overlayCard.innerHTML = pickerHtml({ mandatory, firstRun, currentMode });
+    overlay.classList.add('visible');
+    overlay.setAttribute('data-mode', mandatory ? 'picker-mandatory' : 'picker');
+  };
+
+  const closeOverlay = () => {
     if (overlay) overlay.classList.remove('visible');
   };
-  if (helpBtn) helpBtn.addEventListener('click', () => openHelp(false));
-  if (helpClose) helpClose.addEventListener('click', () => {
-    closeHelp();
-    try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
-  });
-  if (overlay) overlay.addEventListener('click', (ev) => {
+
+  // The overlay-card is regenerated on each open, so click handling has
+  // to be delegated to the overlay itself.
+  overlay?.addEventListener('click', (ev) => {
     if (ev.target === overlay) {
-      closeHelp();
-      try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
+      // Backdrop click — only closes if the overlay is not mandatory.
+      if (overlay.getAttribute('data-mode') === 'picker-mandatory') return;
+      closeOverlay();
+      return;
+    }
+    const helpClose = ev.target.closest('[data-testid="help-close-btn"]');
+    if (helpClose) {
+      closeOverlay();
+      return;
+    }
+    const modeOption = ev.target.closest('[data-mode-option]');
+    if (modeOption) {
+      const mode = modeOption.getAttribute('data-mode-option');
+      const convId = getConvId();
+      // First-run pick sets global default; per-conversation picks after
+      // first run only set the per-conversation override.
+      if (!hasPickedFTU()) {
+        setGlobalVigilance(mode);
+        markFTUPicked();
+      } else if (convId) {
+        setConversationVigilance(convId, mode);
+      } else {
+        setGlobalVigilance(mode);
+      }
+      setChipTo(mode);
+      closeOverlay();
+      if (callbacks.onVigilanceChange) callbacks.onVigilanceChange(mode);
+      return;
     }
   });
-  // Escape closes the overlay from anywhere in the shadow root.
+
+  // Escape closes the overlay unless it's mandatory.
   root.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && overlay?.classList.contains('visible')) {
-      closeHelp();
-      try { localStorage.setItem('concon:ftu-seen', '1'); } catch (_) { /* noop */ }
-    }
+    if (ev.key !== 'Escape') return;
+    if (!overlay?.classList.contains('visible')) return;
+    if (overlay.getAttribute('data-mode') === 'picker-mandatory') return;
+    closeOverlay();
   });
-  // First run: fire once per browser install.
-  try {
-    if (!localStorage.getItem('concon:ftu-seen')) {
-      // Delay slightly so the panel visually settles first.
-      setTimeout(() => openHelp(true), 400);
-    }
-  } catch (_) { /* noop */ }
+
+  if (helpBtn) helpBtn.addEventListener('click', openHelp);
+  if (modeChip) modeChip.addEventListener('click', () => openModePicker({ mandatory: false }));
+
+  // Initialise chip to current effective mode.
+  setChipTo(getEffectiveVigilance(getConvId()));
+
+  // Expose a chip-refresher on the callbacks object so mount.js can sync
+  // it when the current conversation changes (per-conversation override
+  // may differ from the global default).
+  callbacks._refreshChip = () => setChipTo(getEffectiveVigilance(getConvId()));
+  callbacks._openModePicker = openModePicker;
+
+  // First run: fire the mandatory mode picker once per install.
+  if (!hasPickedFTU()) {
+    setTimeout(() => openModePicker({ mandatory: true, firstRun: true }), 400);
+  }
 
   // Wire the view-mode toggle.
   const toggleEl = root.querySelector('[data-testid="view-toggle"]');
@@ -958,6 +1067,73 @@ export function renderPanel(shadowRoot, callbacks = {}) {
   });
 
   return { root, shadowRoot };
+}
+
+// -----------------------------------------------------------------------------
+// Static overlay HTML — help panel + vigilance mode picker.
+// -----------------------------------------------------------------------------
+
+const HELP_HTML = `
+  <h4 data-testid="help-title">What ConCon does</h4>
+  <p>ConCon is a ledger of what you and ChatGPT have actually agreed to in this conversation. It reads each turn as it appears and pulls out commitment-shaped statements. You decide what counts.</p>
+
+  <h5>Four concepts</h5>
+  <ul>
+    <li><strong>Commitment</strong> — something you or the assistant said would happen. "I'll ship it Friday." "Add retry logic."</li>
+    <li><strong>Confirm</strong> — you lock it into the shared record. The assistant can rely on it in later turns.</li>
+    <li><strong>Contest</strong> — you flag it as wrong or unwanted. The record shows the disagreement.</li>
+    <li><strong>Drift</strong> — the assistant assumes something you never confirmed. Coming soon: colored markers on the chat itself so you can spot it while scrolling.</li>
+  </ul>
+
+  <h5>Vigilance modes</h5>
+  <p>Set how much scrutiny you want per conversation via the mode chip in the header. Trust auto-confirms firm commitments, Balanced auto-confirms only unhedged ones, Wary requires a tap for everything. You can always contest an entry regardless of mode.</p>
+
+  <h5>Where your data lives</h5>
+  <p>On this device only. ConCon stores observed turns and your ledger in your browser (IndexedDB) so both survive a refresh. Nothing is sent to ConCon, OpenAI, or any external service. There are no accounts, no telemetry, no API calls. To wipe everything, clear the extension's site data or uninstall it.</p>
+
+  <div class="overlay-actions">
+    <button class="overlay-btn" data-testid="help-close-btn">got it</button>
+  </div>
+`;
+
+const MODE_META = {
+  trust: {
+    label: 'Trust',
+    desc: 'Watch quietly. Firm commitments auto-confirm; the tool never interrupts. You can still contest anything after the fact.',
+  },
+  balanced: {
+    label: 'Balanced',
+    desc: 'Default. Firm unhedged commitments auto-confirm; hedged or ambiguous entries wait for your tap.',
+  },
+  wary: {
+    label: 'Wary',
+    desc: 'High-stakes. Every entry waits for your tap. Divergence alerts fire when the assistant references something you never confirmed. (Alerts land in a later release.)',
+  },
+};
+
+function pickerHtml({ mandatory = false, firstRun = false, currentMode = 'balanced' } = {}) {
+  const title = firstRun
+    ? 'Welcome. Pick a vigilance mode to start.'
+    : (mandatory ? 'Pick a vigilance mode' : 'Vigilance mode');
+  const preamble = firstRun
+    ? `<p>Your choice of mode is itself an act of ratification — it tells the tool how much tapping you want to do. You can change this later per conversation via the mode chip in the header.</p>`
+    : `<p>This choice applies to <em>this conversation</em>. Your global default stays unchanged.</p>`;
+  const options = VIGILANCE_MODES.map((m) => {
+    const selected = m === currentMode ? ' selected' : '';
+    const meta = MODE_META[m];
+    return `
+      <button class="mode-option${selected}" data-mode-option="${m}" data-testid="mode-option-${m}">
+        <div class="mode-option-title">${meta.label}</div>
+        <div class="mode-option-desc">${meta.desc}</div>
+      </button>
+    `;
+  }).join('');
+  return `
+    <h4 data-testid="picker-title">${title}</h4>
+    ${preamble}
+    <div class="mode-picker" data-testid="mode-picker" role="radiogroup">${options}</div>
+    <div class="mode-hint">Tap an option to select and continue.</div>
+  `;
 }
 
 // -----------------------------------------------------------------------------

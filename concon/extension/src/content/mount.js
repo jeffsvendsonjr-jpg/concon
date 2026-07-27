@@ -31,6 +31,7 @@ let unsubscribeLedger = null;
 let navWatched = false;
 let viewMode = 'chronological';
 let searchQuery = '';
+let currentPanelCallbacks = null;
 
 function parseConversationId(url = location.href) {
   const m = url.match(/\/c\/([a-zA-Z0-9-]{8,})/);
@@ -65,7 +66,7 @@ function ensurePanelHost() {
   host.style.cssText = 'all: initial;';
   document.documentElement.appendChild(host);
   shadowRoot = host.attachShadow({ mode: 'open' });
-  renderPanel(shadowRoot, {
+  const panelCallbacks = {
     onTransition: (entryId, newState) => {
       if (!currentConversationId) return;
       transitionLedgerEntry(currentConversationId, entryId, newState);
@@ -82,7 +83,14 @@ function ensurePanelHost() {
     onToggleCollapse: () => {
       toggleCollapsed();
     },
-  });
+    // Vigilance-aware panel needs to know which conversation it's in so it
+    // can save per-conversation mode overrides.
+    getConversationId: () => currentConversationId,
+    onVigilanceChange: () => refreshPanel(),
+  };
+  renderPanel(shadowRoot, panelCallbacks);
+  // Stash for later invocation from onConversationChange.
+  currentPanelCallbacks = panelCallbacks;
   attachDock();
   onLayoutChange(refreshPanel);
   return host;
@@ -121,6 +129,9 @@ async function onConversationChange() {
   ensurePanelHost();
   setConversationId(newId);
   await loadConversation(newId);
+  // Sync the vigilance chip to whatever mode is effective for this
+  // conversation (per-conversation override, else global default).
+  if (currentPanelCallbacks?._refreshChip) currentPanelCallbacks._refreshChip();
   unsubscribeTurns = on('turn:updated', ({ conversationId }) => {
     if (conversationId === currentConversationId) refreshPanel();
   });

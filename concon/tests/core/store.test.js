@@ -123,3 +123,77 @@ test('loadConversation rebuilds ledger from messages when persisted row lacks on
   assert.equal(after.ledger.entries.length, 1, 'rebuild produced the expected entry');
   assert.equal(after.ledger.entries[0].state, 'proposed', 'rebuilt entry starts as proposed');
 });
+
+// -------------------- vigilance-driven auto-confirm on ingest --------------------
+
+function installFakeLocalStorage() {
+  const s = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (s.has(k) ? s.get(k) : null),
+    setItem: (k, v) => { s.set(k, String(v)); },
+    removeItem: (k) => { s.delete(k); },
+    clear: () => { s.clear(); },
+  };
+  return s;
+}
+
+test('trust mode auto-confirms newly extracted entries at ingest time', async () => {
+  installFakeIDB();
+  installFakeLocalStorage();
+  const vig = await import('../../extension/src/core/vigilance.js?fresh=' + Math.random());
+  vig.setGlobalVigilance('trust');
+
+  const { _resetStore, ingest, getConversation } =
+    await import('../../extension/src/core/store.js?fresh=' + Math.random());
+  _resetStore();
+
+  const cid = 'conv-trust-1';
+  ingest({ conversationId: cid, id: 'm1', role: 'user', text: "I will ship the ledger.", observedAt: 1000 });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const conv = getConversation(cid);
+  assert.equal(conv.ledger.entries.length, 1);
+  assert.equal(conv.ledger.entries[0].state, 'confirmed', 'trust auto-confirms user commitment');
+});
+
+test('wary mode leaves entries proposed even for firm commitments', async () => {
+  installFakeIDB();
+  installFakeLocalStorage();
+  const vig = await import('../../extension/src/core/vigilance.js?fresh=' + Math.random());
+  vig.setGlobalVigilance('wary');
+
+  const { _resetStore, ingest, getConversation } =
+    await import('../../extension/src/core/store.js?fresh=' + Math.random());
+  _resetStore();
+
+  const cid = 'conv-wary-1';
+  ingest({ conversationId: cid, id: 'm1', role: 'user', text: "I will ship the ledger.", observedAt: 1000 });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const conv = getConversation(cid);
+  assert.equal(conv.ledger.entries[0].state, 'proposed', 'wary requires manual ratification');
+});
+
+test('balanced mode auto-confirms firm entries and leaves hedged ones proposed', async () => {
+  installFakeIDB();
+  installFakeLocalStorage();
+  const vig = await import('../../extension/src/core/vigilance.js?fresh=' + Math.random());
+  vig.setGlobalVigilance('balanced');
+
+  const { _resetStore, ingest, getConversation } =
+    await import('../../extension/src/core/store.js?fresh=' + Math.random());
+  _resetStore();
+
+  const cid = 'conv-balanced-1';
+  ingest({ conversationId: cid, id: 'm1', role: 'user', text: "I will ship the ledger.", observedAt: 1000 });
+  ingest({ conversationId: cid, id: 'm2', role: 'user', text: "I want Facebook if technically possible.", observedAt: 2000 });
+  await new Promise((r) => setTimeout(r, 30));
+
+  const conv = getConversation(cid);
+  const firm = conv.ledger.entries.find((e) => /ship/.test(e.sentence));
+  const hedged = conv.ledger.entries.find((e) => /Facebook/.test(e.sentence));
+  assert.ok(firm && hedged);
+  assert.equal(firm.state, 'confirmed', 'balanced auto-confirms firm');
+  assert.equal(hedged.state, 'proposed', 'balanced leaves hedged proposed');
+});
+

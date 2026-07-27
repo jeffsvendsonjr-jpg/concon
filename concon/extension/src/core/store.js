@@ -10,6 +10,7 @@
 import { makeMessageRecord } from './message-model.js';
 import { updateOutline } from './outline.js';
 import { updateLedger, transitionEntry } from './ledger.js';
+import { getEffectiveVigilance, autoStateFor } from './vigilance.js';
 
 const state = {
   // conversationId → { messages: Map<messageId, MessageRecord>, order: number, outline: OutlineState|null }
@@ -47,10 +48,34 @@ export function ingest({ conversationId, id, role, text, observedAt }) {
     conv.messages.set(id, rec);
   }
   conv.outline = updateOutline(conv.outline, Array.from(conv.messages.values()));
+  const prevLedger = conv.ledger;
   conv.ledger = updateLedger(conv.ledger, Array.from(conv.messages.values()));
+  conv.ledger = applyVigilance(conv.ledger, prevLedger, conversationId);
   schedulePersist();
   emit('turn:updated', { conversationId, id });
   return conv.messages.get(id);
+}
+
+// Apply the effective vigilance mode to freshly-added entries.
+//
+// This runs after updateLedger has produced the new ledger. We only
+// transition entries that (a) did not exist in the previous ledger, and
+// (b) are still in their auto-set inferred state (proposed for user,
+// asserted for assistant). User-touched entries are never overridden.
+function applyVigilance(nextLedger, prevLedger, conversationId) {
+  if (!nextLedger || !nextLedger.entries) return nextLedger;
+  const mode = getEffectiveVigilance(conversationId);
+  if (mode === 'wary') return nextLedger; // nothing auto-confirms
+  const prevIds = new Set((prevLedger?.entries || []).map((e) => e.id));
+  let out = nextLedger;
+  for (const entry of nextLedger.entries) {
+    if (prevIds.has(entry.id)) continue;
+    if (entry.state !== 'proposed' && entry.state !== 'asserted') continue;
+    const target = autoStateFor(entry, mode);
+    if (!target) continue;
+    out = transitionEntry(out, entry.id, target) || out;
+  }
+  return out;
 }
 
 export function transitionLedgerEntry(conversationId, entryId, newState) {
