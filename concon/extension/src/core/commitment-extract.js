@@ -35,6 +35,8 @@ const HUMAN_IMPERATIVE_LEAD = new Set([
   'delete', 'remove', 'add', 'change', 'fix', 'update', 'create',
   'implement', 'try', 'stop', 'keep', 'give', 'show', 'tell',
   'draft', 'refactor', 'rename', 'move', 'commit', 'push',
+  'reduce', 'harden', 'expand', 'certify', 'publish', 'verify',
+  'audit', 'gate', 'block', 'enforce', 'require', 'confirm',
 ]);
 
 // -------------------------------------------------------------------------
@@ -102,13 +104,25 @@ export function splitSentences(text) {
   // Char-by-char scan. A run of terminating punctuation is a real sentence
   // boundary only when it's followed by whitespace or end-of-string. This
   // keeps `transformers.js`, `v0.1`, `e.g.`, `i.e.`, URLs, and decimal
-  // numbers inside a single sentence.
+  // numbers inside a single sentence. Newlines are treated as unconditional
+  // boundaries — this is how bullet lists (which lack terminal punctuation)
+  // get split into individual items.
   const sentences = [];
   const len = stripped.length;
   const isTerm = (c) => c === '.' || c === '!' || c === '?';
   let start = 0;
   for (let i = 0; i < len; i++) {
-    if (!isTerm(stripped[i])) continue;
+    const c = stripped[i];
+    if (c === '\n') {
+      const raw = stripped.slice(start, i);
+      const trimmed = raw.trim();
+      if (trimmed.length > 0) {
+        sentences.push({ text: trimmed, startOffset: start, endOffset: i });
+      }
+      start = i + 1;
+      continue;
+    }
+    if (!isTerm(c)) continue;
     // Consume any additional terminators (e.g. "!!!", "?!").
     let j = i;
     while (j + 1 < len && isTerm(stripped[j + 1])) j++;
@@ -144,8 +158,13 @@ function matchesAny(text, patterns) {
 }
 
 function isImperativeLead(text) {
-  const first = String(text || '')
+  // Strip leading bullet markers ("-", "*", "•", "1.", "1)") so bullet-list
+  // items are classified by their first *content* word, not their marker.
+  const cleaned = String(text || '')
     .trim()
+    .replace(/^[-*•·▪▫◦]+\s+/, '')
+    .replace(/^\d+[.)]\s+/, '');
+  const first = cleaned
     .split(/\s+/, 1)[0]
     ?.toLowerCase()
     ?.replace(/[^\w']/g, '') || '';
@@ -165,6 +184,11 @@ function classify(sentence, role) {
   }
   if (role === 'assistant') {
     if (matchesAny(sentence, ASSISTANT_COMMIT_CUES)) return 'commitment';
+    // Assistant imperative-lead — matches bullet-shaped recommendations
+    // ("Fix X", "Reduce Y", "Add Z"). Classified as 'statement' because
+    // it's a proposal from the assistant, not a commitment the assistant
+    // is personally making; the human still needs to ratify.
+    if (isImperativeLead(sentence)) return 'statement';
     if (ASSISTANT_ASSERTION.test(sentence)) return 'statement';
     return null;
   }

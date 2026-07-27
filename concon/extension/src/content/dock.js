@@ -22,12 +22,10 @@
 import { selectors } from './selectors.js';
 
 const WIDE_BREAKPOINT = 1150;
-const NARROW_BREAKPOINT = 700;
 
 const MODES = {
   wide:    { panelWidth: 340, railWidth: 48 },
   narrow:  { panelWidth: 300, railWidth: 40 },
-  overlay: { panelWidth: 300, railWidth: 40 },
 };
 
 const STYLE_EL_ID = 'concon-dock-stylesheet';
@@ -181,7 +179,7 @@ function ensureStyleEl() {
 
 function writeCss(mode, collapsed) {
   const el = ensureStyleEl();
-  const dims = MODES[mode] || MODES.overlay;
+  const dims = MODES[mode] || MODES.narrow;
   const activeWidth = collapsed ? dims.railWidth : dims.panelWidth;
 
   // Custom properties cascade into the shadow-DOM panel's :host via CSS
@@ -194,21 +192,16 @@ function writeCss(mode, collapsed) {
     }
   `;
 
-  if (mode === 'overlay') {
-    el.textContent = rootVars;
-    return;
-  }
-
   // Reflow strategy: shrink the app shell (.w-screen) by ${activeWidth}px.
   // Padding on body has no effect on ChatGPT's chat column because the
   // shell is a Tailwind `w-screen` div (width: 100vw), which ignores its
   // parent's box. Overriding its width via `!important` beats Tailwind's
-  // utility. `max-width` and `min-width` are set together to defeat any
-  // subsequent width-clamping utility.
+  // utility. `max-width` is set together to defeat any subsequent
+  // width-clamping utility.
   //
-  // We also keep body padding + tagged-container padding as belt-and-
-  // suspenders for older / different ChatGPT builds that don't use
-  // .w-screen at the top.
+  // We reflow at all viewport widths; the user decides how much space
+  // chat gets by collapsing/expanding the rail (Curator Principle:
+  // don't decide for the user what's readable at their viewport).
   el.textContent = `
     ${rootVars}
     html[data-concon-layout="docked"] [${SHELL_ATTR}="true"] {
@@ -216,12 +209,6 @@ function writeCss(mode, collapsed) {
       max-width: calc(100vw - ${activeWidth}px) !important;
       min-width: 0 !important;
       transition: width 0.18s ease, max-width 0.18s ease;
-    }
-    html[data-concon-layout="docked"] body {
-      padding-right: 0 !important;
-    }
-    html[data-concon-layout="docked"] [${TARGET_ATTR}="true"] {
-      padding-right: 0 !important;
     }
   `;
 }
@@ -235,8 +222,7 @@ function clearCss() {
 function computeMode() {
   const w = window.innerWidth;
   if (w >= WIDE_BREAKPOINT) return 'wide';
-  if (w >= NARROW_BREAKPOINT) return 'narrow';
-  return 'overlay';
+  return 'narrow';
 }
 
 function notify() {
@@ -257,8 +243,7 @@ function apply() {
   const owner = locateAndTagContainer();
   state.container = owner;
 
-  const layoutAttr = mode === 'overlay' ? 'overlay' : 'docked';
-  document.documentElement.setAttribute('data-concon-layout', layoutAttr);
+  document.documentElement.setAttribute('data-concon-layout', 'docked');
   document.documentElement.setAttribute('data-concon-mode', mode);
   document.documentElement.setAttribute('data-concon-collapsed', state.collapsed ? 'true' : 'false');
 
@@ -276,7 +261,7 @@ export function attachDock() {
   if (state.attached) return;
   state.attached = true;
   state.collapsed = loadPersistedCollapsed(state.conversationId);
-  state.mediaQuery = window.matchMedia(`(min-width: ${NARROW_BREAKPOINT}px)`);
+  state.mediaQuery = window.matchMedia(`(min-width: ${WIDE_BREAKPOINT}px)`);
   state.mediaQuery.addEventListener('change', apply);
   window.addEventListener('resize', onResize);
   startContainerObserver();
@@ -337,7 +322,7 @@ export function onLayoutChange(cb) {
 export function _resetDock() {
   detachDock();
   state.collapsed = true;
-  state.mode = 'overlay';
+  state.mode = 'narrow';
   state.conversationId = null;
   listeners.clear();
 }
