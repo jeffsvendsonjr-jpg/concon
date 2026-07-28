@@ -195,14 +195,14 @@ function isQuestion(text) {
   return /\?\s*$/.test(String(text || '').trim());
 }
 
+import { matchRule } from './custom-rules.js';
+
 function classify(sentence, role) {
   if (isQuestion(sentence)) return null;
   if (role === 'user') {
     if (matchesAny(sentence, HUMAN_COMMIT_CUES)) return 'commitment';
     if (isImperativeLead(sentence)) return 'commitment';
-    return null;
-  }
-  if (role === 'assistant') {
+  } else if (role === 'assistant') {
     if (matchesAny(sentence, ASSISTANT_COMMIT_CUES)) return 'commitment';
     // Assistant imperative-lead — matches bullet-shaped recommendations
     // ("Fix X", "Reduce Y", "Add Z"). Classified as 'statement' because
@@ -210,8 +210,12 @@ function classify(sentence, role) {
     // is personally making; the human still needs to ratify.
     if (isImperativeLead(sentence)) return 'statement';
     if (ASSISTANT_ASSERTION.test(sentence)) return 'statement';
-    return null;
   }
+  // Custom user-taught rules — applied only when the built-in
+  // classifier didn't match. Doctrine: built-ins are the primary
+  // signal, user rules *extend* rather than *override*.
+  const custom = matchRule(sentence, role);
+  if (custom) return custom.classification;
   return null;
 }
 

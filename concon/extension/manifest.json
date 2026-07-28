@@ -28,6 +28,7 @@
         "src/core/search.js",
         "src/core/concon-check.js",
         "src/core/vigilance.js",
+        "src/core/custom-rules.js",
         "src/panel/panel.js"
       ],
       "matches": ["https://chatgpt.com/*"]

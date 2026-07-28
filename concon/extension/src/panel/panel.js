@@ -16,6 +16,7 @@ import { groupByTopic } from '../core/ledger.js';
 import { searchLedger, countTranscriptOnly, highlightMatch } from '../core/search.js';
 import { runCheck, formatStatusHeadline, formatReportAsMarkdown } from '../core/concon-check.js';
 import { getEffectiveVigilance, setConversationVigilance, setGlobalVigilance, hasPickedFTU, markFTUPicked, MODES as VIGILANCE_MODES } from '../core/vigilance.js';
+import { getRules as getCustomRules, addRule as addCustomRule, removeRule as removeCustomRule } from '../core/custom-rules.js';
 
 const STYLE = `
   :host { all: initial; }
@@ -455,6 +456,151 @@ const STYLE = `
     transition: background 0.15s ease;
   }
   .check-btn:hover { background: #3a342a; }
+  .rules-btn {
+    all: unset;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1c1a17;
+    background: #fbfaf7;
+    border: 1px solid #d9d1c0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .rules-btn:hover { background: #ebe5d3; border-color: #b0632d; }
+  .rules-btn .count {
+    color: #b0632d;
+    font-weight: 600;
+    margin-left: 2px;
+  }
+  /* Rules view — full-body view replacing the ledger, like the report. */
+  .rules {
+    padding: 4px 4px 14px;
+  }
+  .rules-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .rules-preamble {
+    padding: 12px 14px;
+    border-radius: 4px;
+    background: #fbfaf7;
+    border: 1px solid #d9d1c0;
+    margin-bottom: 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #4a453b;
+  }
+  .rules-preamble strong { color: #1c1a17; }
+  .rules-add {
+    padding: 10px 12px;
+    border-radius: 4px;
+    background: #ebe5d3;
+    margin-bottom: 12px;
+  }
+  .rules-add label {
+    display: block;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a715f;
+    margin-bottom: 4px;
+  }
+  .rules-add input,
+  .rules-add select {
+    all: unset;
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    background: #fbfaf7;
+    border: 1px solid #c9bfa9;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #1c1a17;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+  }
+  .rules-add select { cursor: pointer; }
+  .rules-add-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .rules-add button {
+    all: unset;
+    display: inline-block;
+    padding: 6px 14px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f6f2ea;
+    background: #1c1a17;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .rules-add button:hover { background: #3a342a; }
+  .rule-list-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: #7a715f;
+    font-style: italic;
+    text-align: center;
+  }
+  .rule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid #d9d1c0;
+    background: #fbfaf7;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  .rule-phrase {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    color: #1c1a17;
+    font-weight: 600;
+  }
+  .rule-meta {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9px;
+    color: #7a715f;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .rule-delete {
+    all: unset;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #a13a2b;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .rule-delete:hover { background: #faedde; }
+  /* Footer feedback link — GitHub Issues shortcut. Zero network call
+     originates from ConCon; the user is the one making the request. */
+  .footer-link {
+    color: #7a715f;
+    text-decoration: none;
+    border-bottom: 1px dotted #b0a892;
+    margin-left: 8px;
+  }
+  .footer-link:hover { color: #1c1a17; border-bottom-color: #b0632d; }
   /* Report view — replaces the ledger body while Check is active. */
   .report {
     padding: 4px 4px 14px;
@@ -848,6 +994,7 @@ export function renderPanel(shadowRoot, callbacks = {}) {
           <button data-view="chronological" class="active" data-testid="view-chronological-btn">chrono</button>
           <button data-view="topic" data-testid="view-topic-btn">topic</button>
         </div>
+        <button class="rules-btn" data-testid="rules-btn" title="teach ConCon your own patterns">rules<span class="count" data-testid="rules-count"></span></button>
         <button class="check-btn" data-testid="check-btn" title="run a state-integrity check">check</button>
       </div>
       <div class="toolbar-row search-row">
