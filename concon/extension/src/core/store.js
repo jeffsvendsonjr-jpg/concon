@@ -98,6 +98,23 @@ export function getConversation(conversationId) {
   };
 }
 
+// Rebuild the ledger for the given conversation from all currently-known
+// messages, then re-apply vigilance-based auto-transitions to any newly
+// surfaced entries. Called when custom rules change so freshly-taught
+// rules can catch already-observed messages retroactively. User-managed
+// entry states (confirmed / contested / dismissed) are preserved by
+// updateLedger's key-matching logic.
+export function reExtractConversation(conversationId) {
+  if (!conversationId) return null;
+  const conv = getConv(conversationId);
+  const prev = conv.ledger;
+  conv.ledger = updateLedger(null, Array.from(conv.messages.values()));
+  conv.ledger = applyVigilance(conv.ledger, prev, conversationId);
+  schedulePersist();
+  emit('ledger:updated', { conversationId, reExtracted: true });
+  return conv.ledger;
+}
+
 // ---------- persistence ----------
 
 const DB_NAME = 'concon';

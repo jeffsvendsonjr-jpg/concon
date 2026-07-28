@@ -200,22 +200,26 @@ import { matchRule } from './custom-rules.js';
 function classify(sentence, role) {
   if (isQuestion(sentence)) return null;
   if (role === 'user') {
-    if (matchesAny(sentence, HUMAN_COMMIT_CUES)) return 'commitment';
-    if (isImperativeLead(sentence)) return 'commitment';
+    if (matchesAny(sentence, HUMAN_COMMIT_CUES)) return { classification: 'commitment', source: 'heuristic' };
+    if (isImperativeLead(sentence)) return { classification: 'commitment', source: 'heuristic' };
   } else if (role === 'assistant') {
-    if (matchesAny(sentence, ASSISTANT_COMMIT_CUES)) return 'commitment';
+    if (matchesAny(sentence, ASSISTANT_COMMIT_CUES)) return { classification: 'commitment', source: 'heuristic' };
     // Assistant imperative-lead — matches bullet-shaped recommendations
     // ("Fix X", "Reduce Y", "Add Z"). Classified as 'statement' because
     // it's a proposal from the assistant, not a commitment the assistant
     // is personally making; the human still needs to ratify.
-    if (isImperativeLead(sentence)) return 'statement';
-    if (ASSISTANT_ASSERTION.test(sentence)) return 'statement';
+    if (isImperativeLead(sentence)) return { classification: 'statement', source: 'heuristic' };
+    if (ASSISTANT_ASSERTION.test(sentence)) return { classification: 'statement', source: 'heuristic' };
   }
   // Custom user-taught rules — applied only when the built-in
   // classifier didn't match. Doctrine: built-ins are the primary
-  // signal, user rules *extend* rather than *override*.
+  // signal, user rules *extend* rather than *override*. Rule-matched
+  // entries carry `source: 'custom-rule'` — a higher-confidence signal
+  // than heuristic matches, because the user explicitly declared this
+  // pattern to be a commitment/statement. Vigilance handles the
+  // ratification consequences.
   const custom = matchRule(sentence, role);
-  if (custom) return custom.classification;
+  if (custom) return { classification: custom.classification, source: 'custom-rule', ruleId: custom.id };
   return null;
 }
 
@@ -242,8 +246,8 @@ export function extractFromMessage(message) {
   const sentences = splitSentences(message.text);
   const out = [];
   for (const s of sentences) {
-    const cls = classify(s.text, role);
-    if (!cls) continue;
+    const c = classify(s.text, role);
+    if (!c) continue;
     const hedged = hasHedge(s.text);
     out.push({
       role,
@@ -252,9 +256,14 @@ export function extractFromMessage(message) {
       sentence: s.text,
       startOffset: s.startOffset,
       endOffset: s.endOffset,
-      classification: cls,
+      classification: c.classification,
+      source: c.source,               // 'heuristic' | 'custom-rule'
+      ruleId: c.ruleId || null,       // populated only for custom-rule matches
       hedged,
-      confidence: hedged ? 0.5 : 0.8,
+      // Custom-rule matches carry higher effective confidence because the
+      // user explicitly declared this pattern. Heuristic matches follow
+      // the previous 0.5/0.8 scheme.
+      confidence: c.source === 'custom-rule' ? 0.95 : (hedged ? 0.5 : 0.8),
     });
   }
   return out;

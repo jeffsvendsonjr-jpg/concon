@@ -71,16 +71,21 @@ export function markFTUPicked() {
 // The rule is deliberately conservative:
 //   trust     → confirm every extracted entry (commitment + statement).
 //               The user asked for silence; deliver silence.
-//   balanced  → confirm only firm commitments (unhedged). Statements
-//               and hedged commitments stay proposed for a manual tap.
-//   wary      → confirm nothing automatically.
+//   balanced  → confirm firm unhedged commitments AND anything matched
+//               by a user-taught custom rule (user-declared confidence
+//               is treated as maximum). Everything else stays proposed.
+//   wary      → confirm nothing automatically. Doctrine invariant:
+//               Wary is the user asking for maximum friction, so we
+//               respect it even for custom-rule matches.
 export function autoStateFor(entry, mode) {
   const m = normalize(mode) || DEFAULT_MODE;
   if (!entry) return null;
   if (m === 'wary') return null;
   if (m === 'trust') return entry.role === 'assistant' ? 'acknowledged' : 'confirmed';
   // balanced
-  if (entry.classification === 'commitment' && !entry.hedged) {
+  const customRule = entry.source === 'custom-rule';
+  const firmCommitment = entry.classification === 'commitment' && !entry.hedged;
+  if (customRule || firmCommitment) {
     return entry.role === 'assistant' ? 'acknowledged' : 'confirmed';
   }
   return null;

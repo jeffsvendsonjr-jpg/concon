@@ -20,6 +20,7 @@ import {
   getConversation,
   loadConversation,
   transitionLedgerEntry,
+  reExtractConversation,
 } from '../core/store.js';
 
 const HOST_ID = 'concon-panel-host';
@@ -87,6 +88,10 @@ function ensurePanelHost() {
     // can save per-conversation mode overrides.
     getConversationId: () => currentConversationId,
     onVigilanceChange: () => refreshPanel(),
+    onRulesChange: () => {
+      if (currentConversationId) reExtractConversation(currentConversationId);
+      refreshPanel();
+    },
   };
   renderPanel(shadowRoot, panelCallbacks);
   // Stash for later invocation from onConversationChange.

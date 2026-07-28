@@ -168,6 +168,33 @@ that path b becomes the correct investment before the iOS companion.
 - Local models propose; they never confirm.
 - Vigilance controls proposal rate, never ratification threshold.
 - ConCon Check stays user-initiated; proactive lives in Wary vigilance.
+- Wary is inviolate: no auto-confirm at Wary, regardless of source
+  (heuristic, custom rule, or future local model). Wary is the user
+  asking for maximum friction and we respect that.
+
+## Vigilance thresholds — honest scope (v0.4)
+
+The vigilance modes shipped in v0.4 are **category-based, not
+threshold-based**. The heuristic extractor produces booleans
+(`commitment` / `statement` / `hedged`), not continuous confidence
+scores, so there is nothing to threshold against. Each mode encodes a
+policy over categories:
+
+- Trust: auto-confirm any category.
+- Balanced: auto-confirm firm+unhedged commitments, OR any custom-rule
+  match (user-declared confidence).
+- Wary: auto-confirm nothing.
+
+**Real thresholds land with Step 6** — the bundled local model runtime
+gives every extraction a `commitment_score` and `hedge_score`. Then
+vigilance modes become genuine thresholds (Trust > 0.5, Balanced > 0.75
+& hedge < 0.3, etc.), and advanced users can tune the floors. Until
+then, "vigilance mode" is a policy name over categorical outputs, not
+a probability floor.
+
+Marketing must not claim ConCon has "adjustable sensitivity" or
+"confidence tuning" until Step 6 ships. It has *modes*. That is the
+honest and defensible language.
 
 ## Scope claim (what ConCon does and does not eliminate)
 

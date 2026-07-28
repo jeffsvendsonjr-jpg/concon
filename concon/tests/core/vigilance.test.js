@@ -57,9 +57,11 @@ test('FTU pick flag is unset by default and set by markFTUPicked', () => {
 
 // -------------------- autoStateFor --------------------
 
-const firmUser = { role: 'user', classification: 'commitment', hedged: false };
-const hedgedUser = { role: 'user', classification: 'commitment', hedged: true };
-const asstStmt = { role: 'assistant', classification: 'statement', hedged: false };
+const firmUser = { role: 'user', classification: 'commitment', hedged: false, source: 'heuristic' };
+const hedgedUser = { role: 'user', classification: 'commitment', hedged: true, source: 'heuristic' };
+const asstStmt = { role: 'assistant', classification: 'statement', hedged: false, source: 'heuristic' };
+const customUser = { role: 'user', classification: 'statement', hedged: false, source: 'custom-rule' };
+const customHedged = { role: 'user', classification: 'commitment', hedged: true, source: 'custom-rule' };
 
 test('trust mode: every extracted entry auto-confirms', () => {
   assert.equal(autoStateFor(firmUser, 'trust'), 'confirmed');
@@ -67,16 +69,23 @@ test('trust mode: every extracted entry auto-confirms', () => {
   assert.equal(autoStateFor(asstStmt, 'trust'), 'acknowledged');
 });
 
-test('balanced mode: only firm unhedged commitments auto-confirm', () => {
+test('balanced mode: firm unhedged commitments auto-confirm', () => {
   assert.equal(autoStateFor(firmUser, 'balanced'), 'confirmed');
-  assert.equal(autoStateFor(hedgedUser, 'balanced'), null, 'hedged stays proposed');
+  assert.equal(autoStateFor(hedgedUser, 'balanced'), null, 'hedged heuristic stays proposed');
   assert.equal(autoStateFor(asstStmt, 'balanced'), null, 'assistant statement is not a firm commitment');
 });
 
-test('wary mode: nothing auto-confirms', () => {
+test('balanced mode: custom-rule matches always auto-confirm (user-declared confidence)', () => {
+  assert.equal(autoStateFor(customUser, 'balanced'), 'confirmed');
+  assert.equal(autoStateFor(customHedged, 'balanced'), 'confirmed', 'custom-rule overrides hedge-gate at Balanced');
+});
+
+test('wary mode: nothing auto-confirms, even custom rules (doctrine invariant)', () => {
   assert.equal(autoStateFor(firmUser, 'wary'), null);
   assert.equal(autoStateFor(hedgedUser, 'wary'), null);
   assert.equal(autoStateFor(asstStmt, 'wary'), null);
+  assert.equal(autoStateFor(customUser, 'wary'), null, 'wary respected regardless of source');
+  assert.equal(autoStateFor(customHedged, 'wary'), null);
 });
 
 test('autoStateFor tolerates undefined mode by falling back to default (balanced)', () => {

@@ -1026,7 +1026,7 @@ export function renderPanel(shadowRoot, callbacks = {}) {
         <!-- Content is written by openHelp() / openModePicker(). -->
       </div>
     </div>
-    <div class="footer" data-testid="concon-footer">local · offline · no telemetry</div>
+    <div class="footer" data-testid="concon-footer">local · offline · no telemetry <a class="footer-link" href="https://github.com/concon-ext/concon/issues/new" target="_blank" rel="noopener noreferrer" data-testid="feedback-link">feedback</a></div>
   `;
   shadowRoot.appendChild(root);
 
@@ -1168,8 +1168,18 @@ export function renderPanel(shadowRoot, callbacks = {}) {
   const checkBtn = root.querySelector('[data-testid="check-btn"]');
   if (checkBtn) checkBtn.addEventListener('click', () => {
     reportOpen = true;
+    rulesOpen = false;
     if (callbacks.onOpenCheck) callbacks.onOpenCheck();
   });
+
+  // RULES button — open the custom-rules editor view.
+  const rulesBtn = root.querySelector('[data-testid="rules-btn"]');
+  if (rulesBtn) rulesBtn.addEventListener('click', () => {
+    rulesOpen = true;
+    reportOpen = false;
+    if (callbacks.onOpenRules) callbacks.onOpenRules();
+  });
+  updateRulesCount(root);
 
   // Delegated click handlers for entries: action buttons + click-to-jump.
   const body = root.querySelector('[data-testid="ledger-body"]');
@@ -1179,6 +1189,44 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     if (backBtn) {
       reportOpen = false;
       if (callbacks.onCloseCheck) callbacks.onCloseCheck();
+      return;
+    }
+    // Rules view — back button.
+    const rulesBack = ev.target.closest('[data-testid="rules-back-btn"]');
+    if (rulesBack) {
+      rulesOpen = false;
+      if (callbacks.onCloseRules) callbacks.onCloseRules();
+      return;
+    }
+    // Rules view — add-rule form submit.
+    const rulesAddBtn = ev.target.closest('[data-testid="rules-add-btn"]');
+    if (rulesAddBtn) {
+      const phraseInput = root.querySelector('[data-testid="rules-add-phrase"]');
+      const classSelect = root.querySelector('[data-testid="rules-add-class"]');
+      const roleSelect = root.querySelector('[data-testid="rules-add-role"]');
+      const phrase = phraseInput?.value || '';
+      if (phrase.trim().length === 0) return;
+      addCustomRule({
+        phrase,
+        classification: classSelect?.value || 'commitment',
+        role: roleSelect?.value || 'any',
+      });
+      if (phraseInput) phraseInput.value = '';
+      // Ask mount.js to re-extract so the new rule applies retroactively.
+      if (callbacks.onRulesChange) callbacks.onRulesChange();
+      // Immediate visual refresh so the new rule appears in the list.
+      body.innerHTML = renderRules(getCustomRules());
+      updateRulesCount(root);
+      return;
+    }
+    // Rules view — delete rule.
+    const ruleDelBtn = ev.target.closest('[data-testid="rule-delete"]');
+    if (ruleDelBtn) {
+      const rid = ruleDelBtn.getAttribute('data-rule-id');
+      removeCustomRule(rid);
+      if (callbacks.onRulesChange) callbacks.onRulesChange();
+      body.innerHTML = renderRules(getCustomRules());
+      updateRulesCount(root);
       return;
     }
     // Report "share" button — copy the current report as Markdown.
@@ -1292,11 +1340,14 @@ function pickerHtml({ mandatory = false, firstRun = false, currentMode = 'balanc
 // store event and we want the report to persist across those renders
 // until the user explicitly returns to the ledger.
 let reportOpen = false;
+// Same idea for the rules view.
+let rulesOpen = false;
 // The most recent report object, kept so the share button can serialise
 // it without re-running the check.
 let lastReport = null;
 
 export function isReportOpen() { return reportOpen; }
+export function isRulesOpen() { return rulesOpen; }
 
 export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false } = {}) {
   if (!shadowRoot) return;
@@ -1371,6 +1422,12 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
     });
     lastReport = report;
     body.innerHTML = renderReport(report);
+    return;
+  }
+
+  // Rules view — replaces the ledger while the user is editing custom rules.
+  if (rulesOpen) {
+    body.innerHTML = renderRules(getCustomRules());
     return;
   }
 
@@ -1619,6 +1676,67 @@ async function copyToClipboard(text) {
   } catch (_) {
     return false;
   }
+}
+
+// -----------------------------------------------------------------------------
+// Rules view — the user's own custom pattern list.
+// -----------------------------------------------------------------------------
+
+function renderRules(rules) {
+  const list = rules.length === 0
+    ? `<div class="rule-list-empty" data-testid="rule-list-empty">No custom rules yet. Add one above and it will apply to every conversation.</div>`
+    : rules.map((r) => `
+      <div class="rule-item" data-testid="rule-item">
+        <div>
+          <div class="rule-phrase">${esc(r.phrase)}</div>
+          <div class="rule-meta">${esc(r.classification)} · ${esc(r.role)}</div>
+        </div>
+        <button class="rule-delete" data-testid="rule-delete" data-rule-id="${esc(r.id)}" aria-label="delete rule">delete</button>
+      </div>
+    `).join('');
+
+  return `
+    <div class="rules" data-testid="rules-view">
+      <div class="rules-topbar">
+        <button class="report-back" data-testid="rules-back-btn" aria-label="back to ledger">&lsaquo; back to ledger</button>
+      </div>
+      <div class="rules-preamble">
+        <p><strong>Teach ConCon your own patterns.</strong></p>
+        <p>The built-in extractor catches common phrasing like "I will X" and "we agreed to Y." But you have your own language — words your team uses, phrases that mean "committed" in your world. Add them here and ConCon will catch them from now on.</p>
+        <p>Rules match a case-insensitive phrase inside any sentence. Custom-rule matches always auto-confirm at Balanced (your explicit teaching = high confidence). Wary mode still requires a tap.</p>
+      </div>
+      <div class="rules-add" data-testid="rules-add">
+        <label for="rules-add-phrase">Phrase to match</label>
+        <input type="text" data-testid="rules-add-phrase" placeholder='e.g. "MUST" or "// TODO"' spellcheck="false" autocomplete="off" />
+        <div class="rules-add-row">
+          <div>
+            <label for="rules-add-class">Classify as</label>
+            <select data-testid="rules-add-class">
+              <option value="commitment">commitment</option>
+              <option value="statement">statement</option>
+            </select>
+          </div>
+          <div>
+            <label for="rules-add-role">Applies to</label>
+            <select data-testid="rules-add-role">
+              <option value="any">any speaker</option>
+              <option value="user">you only</option>
+              <option value="assistant">assistant only</option>
+            </select>
+          </div>
+        </div>
+        <button data-testid="rules-add-btn">add rule</button>
+      </div>
+      ${list}
+    </div>
+  `;
+}
+
+function updateRulesCount(root) {
+  const el = root.querySelector('[data-testid="rules-count"]');
+  if (!el) return;
+  const n = getCustomRules().length;
+  el.textContent = n > 0 ? ` ${n}` : '';
 }
 
 // -----------------------------------------------------------------------------
