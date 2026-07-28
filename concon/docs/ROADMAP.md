@@ -120,6 +120,20 @@ Only if pulled by real demand. Requires a backend, which breaks doctrine
 unless carefully designed as a sync-only relay with client-side crypto.
 Cross that bridge only when the market pulls.
 
+### Monetization delivery notes
+
+When Pro tier ships (v1.0+), extend the existing Replit-hosted Stripe
+backend with a single `POST /concon/license` endpoint that receives the
+Stripe webhook, signs an Ed25519 license key, and emails it to the
+purchaser. The extension bundles the corresponding public key and
+verifies licenses offline. Doctrine intact — the extension itself never
+talks to the server post-purchase.
+
+Migrate hosting away from Replit only if Replit reliability becomes the
+blocker on the other project first. Otherwise extension is cheaper than
+migration, and the ConCon license endpoint is small enough that it
+doesn't warrant a dedicated host.
+
 ## iOS strategy — deferred until Chrome traction
 
 Everything in `extension/src/core/` is runtime-agnostic and portable.
