@@ -1320,7 +1320,7 @@ function pickerHtml({ mandatory = false, firstRun = false, currentMode = 'balanc
     ? 'Welcome. Pick a vigilance mode to start.'
     : (mandatory ? 'Pick a vigilance mode' : 'Vigilance mode');
   const preamble = firstRun
-    ? `<p>Your choice tells the tool how much to interrupt you. You can change it later per conversation via the mode chip in the header.</p>`
+    ? `<p>Your choice sets how much you want to weigh in on each entry. You can change it later per conversation via the mode chip in the header.</p>`
     : `<p>This choice applies to <em>this conversation</em>. Your global default stays unchanged.</p>`;
   const options = VIGILANCE_MODES.map((m) => {
     const selected = m === currentMode ? ' selected' : '';
