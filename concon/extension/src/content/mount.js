@@ -14,7 +14,7 @@
 
 import { attachObserver, detachObserver } from './observer.js';
 import { attachDock, detachDock, refreshDock, toggleCollapsed, isCollapsed, onLayoutChange, setConversationId } from './dock.js';
-import { renderPanel, updatePanel } from '../panel/panel.js';
+import { renderPanel, updatePanel, resetPanelViews } from '../panel/panel.js';
 import {
   on,
   getConversation,
@@ -84,6 +84,13 @@ function ensurePanelHost() {
     onToggleCollapse: () => {
       toggleCollapsed();
     },
+    // Panel view flags (report/rules) are toggled inside panel.js on
+    // click, but the render is our responsibility — without these
+    // hooks CHECK and RULES set the flag and nothing else happens.
+    onOpenCheck:  () => refreshPanel(),
+    onCloseCheck: () => refreshPanel(),
+    onOpenRules:  () => refreshPanel(),
+    onCloseRules: () => refreshPanel(),
     // Vigilance-aware panel needs to know which conversation it's in so it
     // can save per-conversation mode overrides.
     getConversationId: () => currentConversationId,
@@ -116,14 +123,14 @@ async function onConversationChange() {
   const newId = parseConversationId();
   if (newId === currentConversationId) return;
   currentConversationId = newId;
+  // A new conversation means transient panel views (Check report, rules
+  // editor) should not carry over. Otherwise a report generated for
+  // conversation A can render against B's data on the next refresh.
+  resetPanelViews();
   detachObserver();
   if (typeof unsubscribeTurns === 'function') { unsubscribeTurns(); unsubscribeTurns = null; }
   if (typeof unsubscribeLedger === 'function') { unsubscribeLedger(); unsubscribeLedger = null; }
   if (!newId) {
-    // Off any conversation route (e.g., homepage, /gpts, /settings).
-    // Hide the panel and release the dock reservation so ChatGPT
-    // reclaims its full width. The host DOM node stays in place so
-    // re-entering a conversation route re-uses it without a remount.
     const host = document.getElementById(HOST_ID);
     if (host) host.style.display = 'none';
     detachDock();
@@ -134,8 +141,11 @@ async function onConversationChange() {
   ensurePanelHost();
   setConversationId(newId);
   await loadConversation(newId);
-  // Sync the vigilance chip to whatever mode is effective for this
-  // conversation (per-conversation override, else global default).
+  // Navigation race: the user may have moved to a different conversation
+  // while loadConversation was awaiting. If they did, `currentConversationId`
+  // now points at the newer id and this handler must bail — otherwise it
+  // would attach an observer keyed to the stale id.
+  if (currentConversationId !== newId) return;
   if (currentPanelCallbacks?._refreshChip) currentPanelCallbacks._refreshChip();
   unsubscribeTurns = on('turn:updated', ({ conversationId }) => {
     if (conversationId === currentConversationId) refreshPanel();

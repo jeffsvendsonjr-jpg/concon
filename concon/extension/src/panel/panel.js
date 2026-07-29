@@ -1349,6 +1349,15 @@ let lastReport = null;
 export function isReportOpen() { return reportOpen; }
 export function isRulesOpen() { return rulesOpen; }
 
+// Reset transient view flags. Called by mount.js when the conversation
+// changes so a Check report opened in conversation A doesn't leak into
+// conversation B.
+export function resetPanelViews() {
+  reportOpen = false;
+  rulesOpen = false;
+  lastReport = null;
+}
+
 export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false } = {}) {
   if (!shadowRoot) return;
   const { messages = [], outline = null, ledger = null } = conversation || {};
