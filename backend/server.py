@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -41,6 +42,23 @@ class StatusCheckCreate(BaseModel):
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
+
+# Serve the packaged ConCon extension zip for one-click download.
+# The zip is rebuilt from /app/concon/extension on each request so a fresh
+# side-load always reflects the current source tree.
+@api_router.get("/download/concon")
+async def download_concon_zip():
+    import shutil, tempfile
+    src = Path("/app/concon/extension")
+    tmp_dir = Path(tempfile.mkdtemp())
+    base = tmp_dir / "concon-latest"
+    shutil.make_archive(str(base), 'zip', root_dir=str(src))
+    zip_path = tmp_dir / "concon-latest.zip"
+    return FileResponse(
+        path=str(zip_path),
+        media_type="application/zip",
+        filename="concon-latest.zip",
+    )
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
