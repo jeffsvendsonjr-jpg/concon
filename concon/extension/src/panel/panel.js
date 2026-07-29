@@ -15,6 +15,7 @@
 import { groupByTopic } from '../core/ledger.js';
 import { searchLedger, countTranscriptOnly, highlightMatch } from '../core/search.js';
 import { runCheck, formatStatusHeadline, formatReportAsMarkdown } from '../core/concon-check.js';
+import { assessCoverage, getCoverageDiagnostics } from '../core/coverage.js';
 import { getEffectiveVigilance, setConversationVigilance, setGlobalVigilance, hasPickedFTU, markFTUPicked, MODES as VIGILANCE_MODES } from '../core/vigilance.js';
 import { getRules as getCustomRules, addRule as addCustomRule, removeRule as removeCustomRule } from '../core/custom-rules.js';
 
@@ -462,6 +463,63 @@ const STYLE = `
     transition: background 0.15s ease;
   }
   .check-btn:hover { background: #3a342a; }
+
+  /* Coverage strip — surfaces when ConCon has only observed a slice of
+     the conversation. Appears between toolbar and body. Doctrine-honest:
+     tells the user *why* the ledger looks partial and gives them the
+     one-click fix. Hidden when coverage is 'full' — no clutter. */
+  .coverage-strip {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 14px;
+    background: linear-gradient(180deg, #f7ecd8 0%, #f2e4c8 100%);
+    border-top: 1px solid #e5d5b0;
+    border-bottom: 1px solid #e5d5b0;
+    font-family: 'Iowan Old Style', Georgia, serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #5a4620;
+    line-height: 1.4;
+  }
+  .coverage-strip.visible { display: flex; }
+  .coverage-strip.unknown {
+    background: linear-gradient(180deg, #f0ede4 0%, #e8e3d5 100%);
+    border-color: #d9d1c0;
+    color: #5a5346;
+  }
+  .coverage-strip-text { flex: 1; min-width: 0; }
+  .coverage-strip-text .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #d4a340;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .coverage-strip.unknown .coverage-strip-text .dot { background: #a89b7d; }
+  .backfill-btn {
+    all: unset;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #f6f2ea;
+    background: #b0632d;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+  .backfill-btn:hover { background: #935025; }
+  .backfill-btn:disabled {
+    background: #a89b7d;
+    cursor: progress;
+    opacity: 0.85;
+  }
   .rules-btn {
     all: unset;
     padding: 4px 10px;
@@ -1019,6 +1077,14 @@ export function renderPanel(shadowRoot, callbacks = {}) {
       </div>
       <div class="search-summary" data-testid="search-summary"></div>
     </div>
+    <div class="coverage-strip" data-testid="coverage-strip">
+      <div class="coverage-strip-text" data-testid="coverage-strip-text">
+        <span class="dot"></span><span data-testid="coverage-strip-label">Only tracking recent turns</span>
+      </div>
+      <button class="backfill-btn" data-testid="backfill-btn" title="scroll the chat to the top so ConCon can see earlier turns">
+        fill in earlier
+      </button>
+    </div>
     <div class="body" data-testid="ledger-body">
       <div class="empty" data-testid="ledger-empty">
         <p><strong>Watching this conversation for drift.</strong></p>
@@ -1189,6 +1255,33 @@ export function renderPanel(shadowRoot, callbacks = {}) {
     if (callbacks.onOpenRules) callbacks.onOpenRules();
   });
   updateRulesCount(root);
+
+  // BACKFILL button — invites ChatGPT to render earlier turns so the
+  // observer can see them. mount.js implements the actual DOM scroll;
+  // panel.js only owns the button state (idle → busy → done). Doctrine:
+  // user-initiated, doesn't touch the composer, restores scroll on exit.
+  const backfillBtn = root.querySelector('[data-testid="backfill-btn"]');
+  if (backfillBtn) backfillBtn.addEventListener('click', async () => {
+    if (!callbacks.onBackfill) return;
+    if (backfillBtn.disabled) return;
+    backfillBtn.disabled = true;
+    const originalLabel = backfillBtn.textContent;
+    backfillBtn.textContent = 'scrolling…';
+    try {
+      await callbacks.onBackfill();
+      backfillBtn.textContent = 'done';
+      setTimeout(() => {
+        backfillBtn.textContent = originalLabel;
+        backfillBtn.disabled = false;
+      }, 1400);
+    } catch (_e) {
+      backfillBtn.textContent = 'try again';
+      setTimeout(() => {
+        backfillBtn.textContent = originalLabel;
+        backfillBtn.disabled = false;
+      }, 1400);
+    }
+  });
 
   // Delegated click handlers for entries: action buttons + click-to-jump.
   const body = root.querySelector('[data-testid="ledger-body"]');
@@ -1367,12 +1460,40 @@ export function resetPanelViews() {
   lastReport = null;
 }
 
-export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false } = {}) {
+export function updatePanel(shadowRoot, { conversation, viewMode = 'chronological', searchQuery = '', collapsed = false, conversationId = null } = {}) {
   if (!shadowRoot) return;
   const { messages = [], outline = null, ledger = null } = conversation || {};
   const turnCount = messages.length;
   const topicCount = outline?.topics?.length || 0;
   const entryCount = ledger?.entries?.length || 0;
+
+  // Coverage — did the observer actually witness this whole conversation
+  // or just a virtualized slice? Rendered as a strip between the toolbar
+  // and the ledger body so the user always knows what the ledger covers.
+  const coverage = conversationId ? assessCoverage(conversationId) : 'unknown';
+  const coverageDiag = conversationId ? getCoverageDiagnostics(conversationId) : { coverage: 'unknown' };
+  const strip = shadowRoot.querySelector('[data-testid="coverage-strip"]');
+  const stripLabel = shadowRoot.querySelector('[data-testid="coverage-strip-label"]');
+  if (strip && stripLabel) {
+    if (coverage === 'full' || turnCount === 0) {
+      strip.classList.remove('visible', 'unknown');
+    } else if (coverage === 'unknown') {
+      strip.classList.add('visible', 'unknown');
+      stripLabel.textContent = 'Warming up — reading turns as they arrive.';
+    } else {
+      strip.classList.add('visible');
+      strip.classList.remove('unknown');
+      if (coverageDiag.minTurn !== undefined && coverageDiag.maxTurn !== undefined) {
+        const seen = coverageDiag.observedCount;
+        const range = `turns ${coverageDiag.minTurn}–${coverageDiag.maxTurn}`;
+        stripLabel.textContent = coverageDiag.topAnchorWitnessed
+          ? `Ledger covers ${seen} turns with gaps. Scroll up to fill them in.`
+          : `Only tracking ${range} (${seen} turns). Earlier turns weren't loaded yet.`;
+      } else {
+        stripLabel.textContent = 'Only tracking recent turns. Earlier turns weren\u2019t loaded yet.';
+      }
+    }
+  }
 
   // Root collapsed class + rail metrics.
   const rootEl = shadowRoot.querySelector('[data-testid="concon-panel"]');
@@ -1432,11 +1553,7 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
       messages,
       ledger,
       outline,
-      // Coverage detection is honest-scope for v0: we cannot verify we
-      // observed the entire conversation (ChatGPT virtualizes long chats
-      // and only rendered turns hit our MutationObserver). Report 'unknown'
-      // until we build proper coverage detection.
-      coverage: 'unknown',
+      coverage,
     });
     lastReport = report;
     body.innerHTML = renderReport(report);

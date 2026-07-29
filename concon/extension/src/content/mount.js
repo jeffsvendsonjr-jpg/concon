@@ -117,6 +117,7 @@ function refreshPanel() {
     viewMode,
     searchQuery,
     collapsed: isCollapsed(),
+    conversationId: currentConversationId,
   });
 }
 
