@@ -5,11 +5,8 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import shutil
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
 
 
 ROOT_DIR = Path(__file__).parent
@@ -27,62 +24,60 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
 
+
 # Serve the packaged ConCon extension zip for one-click download.
-# The zip is rebuilt from /app/concon/extension on each request so a fresh
-# side-load always reflects the current source tree.
+#
+# Security note (SEC-001 fix): the previous implementation created a
+# fresh tempfile.mkdtemp() on every request and never cleaned it up,
+# which would eventually exhaust disk. This version caches the zip at
+# a fixed path and only rebuilds when the source tree changes.
+CONCON_SRC = Path("/app/concon/extension")
+CONCON_CACHE = Path("/tmp/concon-latest.zip")
+
+
+def _latest_source_mtime(root: Path) -> float:
+    latest = 0.0
+    for p in root.rglob("*"):
+        try:
+            m = p.stat().st_mtime
+            if m > latest:
+                latest = m
+        except OSError:
+            continue
+    return latest
+
+
+def _rebuild_concon_zip() -> None:
+    # shutil.make_archive expects a base path without the extension.
+    base = str(CONCON_CACHE.with_suffix(""))
+    tmp_out = shutil.make_archive(base, "zip", root_dir=str(CONCON_SRC))
+    # make_archive returns the created path; move only if needed.
+    if Path(tmp_out) != CONCON_CACHE:
+        shutil.move(tmp_out, CONCON_CACHE)
+
+
 @api_router.get("/download/concon")
 async def download_concon_zip():
-    import shutil, tempfile
-    src = Path("/app/concon/extension")
-    tmp_dir = Path(tempfile.mkdtemp())
-    base = tmp_dir / "concon-latest"
-    shutil.make_archive(str(base), 'zip', root_dir=str(src))
-    zip_path = tmp_dir / "concon-latest.zip"
+    if not CONCON_SRC.is_dir():
+        return {"error": "extension source not available"}
+    src_mtime = _latest_source_mtime(CONCON_SRC)
+    needs_rebuild = (
+        not CONCON_CACHE.exists()
+        or CONCON_CACHE.stat().st_mtime < src_mtime
+    )
+    if needs_rebuild:
+        _rebuild_concon_zip()
     return FileResponse(
-        path=str(zip_path),
+        path=str(CONCON_CACHE),
         media_type="application/zip",
         filename="concon-latest.zip",
     )
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
 
 # Include the router in the main app
 app.include_router(api_router)
