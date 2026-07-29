@@ -23,6 +23,7 @@ import {
   reExtractConversation,
 } from '../core/store.js';
 import { resetCoverage } from '../core/coverage.js';
+import { refreshMarkers, clearAllMarkers } from './drift-markers.js';
 
 const HOST_ID = 'concon-panel-host';
 
@@ -55,6 +56,63 @@ function jumpToTurn(messageId) {
     el.style.outline = prevOutline;
     el.style.transition = prevTransition;
   }, 1400);
+}
+
+// Find ChatGPT's actual scrollable container. `main` is the semantic
+// anchor but the real scroll often lives on an inner div. Walk up from
+// the first turn element until we find an ancestor whose scrollHeight
+// exceeds its clientHeight — that's the container.
+function findChatScrollContainer() {
+  const anyTurn = document.querySelector('[data-testid^="conversation-turn-"]');
+  if (!anyTurn) return null;
+  let el = anyTurn.parentElement;
+  while (el && el !== document.body) {
+    const style = getComputedStyle(el);
+    const overflowsY = /(auto|scroll)/.test(style.overflowY);
+    if (overflowsY && el.scrollHeight > el.clientHeight + 4) {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  // Fallback to the scrolling element (window/documentElement).
+  return document.scrollingElement || document.documentElement;
+}
+
+// Backfill: scroll ChatGPT to the top so it renders older (virtualized)
+// turns into the DOM, wait for it to settle, then restore the user's
+// original scroll position. Doctrine: user-initiated, non-destructive.
+// We never touch the composer, never navigate, never persist anything
+// we couldn't have seen by scrolling manually ourselves.
+async function backfillCurrentConversation() {
+  const container = findChatScrollContainer();
+  if (!container) return;
+  const originalScroll = container.scrollTop;
+  const startTurnCount = document.querySelectorAll('[data-testid^="conversation-turn-"]').length;
+
+  // Nudge scroll up in stages so ChatGPT's virtualization has time to
+  // materialise older turns. A single scrollTo(0) can race the loader.
+  const MAX_PASSES = 12;
+  const PASS_WAIT_MS = 350;
+  let lastCount = startTurnCount;
+  let stableStreak = 0;
+  for (let i = 0; i < MAX_PASSES; i++) {
+    container.scrollTop = 0;
+    await new Promise((r) => setTimeout(r, PASS_WAIT_MS));
+    const currentCount = document.querySelectorAll('[data-testid^="conversation-turn-"]').length;
+    if (currentCount === lastCount) {
+      stableStreak++;
+      // Two consecutive passes with no new turns → we've reached the top.
+      if (stableStreak >= 2) break;
+    } else {
+      stableStreak = 0;
+      lastCount = currentCount;
+    }
+  }
+
+  // Give the observer one final beat to ingest whatever just mounted
+  // before we scroll the user back to where they were.
+  await new Promise((r) => setTimeout(r, 400));
+  container.scrollTo({ top: originalScroll, behavior: 'smooth' });
 }
 
 function ensurePanelHost() {
@@ -100,6 +158,14 @@ function ensurePanelHost() {
       if (currentConversationId) reExtractConversation(currentConversationId);
       refreshPanel();
     },
+    // Backfill: user asked ConCon to see earlier turns. Scroll the chat
+    // to the top, let virtualization materialise them, then restore the
+    // user's scroll position. Refresh the panel afterward so the
+    // coverage strip reflects the newly-observed turns.
+    onBackfill: async () => {
+      await backfillCurrentConversation();
+      refreshPanel();
+    },
   };
   renderPanel(shadowRoot, panelCallbacks);
   // Stash for later invocation from onConversationChange.
@@ -119,6 +185,11 @@ function refreshPanel() {
     collapsed: isCollapsed(),
     conversationId: currentConversationId,
   });
+  // Inline drift markers on ChatGPT's turns. Kept in sync with the
+  // ledger on every panel refresh. Doctrine: non-destructive; markers
+  // are ConCon-owned elements attached to ChatGPT's turn wrappers and
+  // torn down on nav / detach.
+  refreshMarkers(conversation);
 }
 
 async function onConversationChange() {
@@ -134,6 +205,9 @@ async function onConversationChange() {
   // longer observing it, so anything we knew about which turns we saw
   // shouldn't influence a future audit of it.
   if (previousId) resetCoverage(previousId);
+  // Drift markers are inline in the previous conversation's DOM. Clear
+  // them before we detach so we leave ChatGPT's DOM as we found it.
+  clearAllMarkers();
   detachObserver();
   if (typeof unsubscribeTurns === 'function') { unsubscribeTurns(); unsubscribeTurns = null; }
   if (typeof unsubscribeLedger === 'function') { unsubscribeLedger(); unsubscribeLedger = null; }

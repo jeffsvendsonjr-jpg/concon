@@ -1,13 +1,14 @@
 # ConCon — Product Requirements Document
 
-**Status:** v0.3.1 shipped — external code review from ChatGPT applied.
-Fixed P0 ledger restoration bug (data was silently lost after refresh),
-corrected the privacy copy to accurately describe IndexedDB persistence,
-extended the extractor for bare "I want" and conditional hedges, and
-shipped ConCon Check v0 as a deterministic state-integrity audit
-(honest-scope: not a semantic drift detector — that ships with Step 6+).
-70/70 unit tests pass. Testing agent verified all fixes on
-2026-07-27.
+**Status:** v0.5.0 shipped — coverage detection + backfill + inline drift
+markers. ConCon can now honestly say when it's only seen a slice of the
+conversation (partial coverage) and offers a one-click "fill in earlier
+turns" button that scrolls ChatGPT to the top so virtualization
+materializes older turns. Inline colored strips on each turn make
+unresolved entries visible while scrolling. Vocabulary pass replaced
+"ratify" / "proposed" / "asserted" with plain English throughout, and
+typography was bumped to 14px/500-weight for readability on cream.
+109/109 unit tests pass.
 
 ## Original problem statement
 
@@ -229,9 +230,16 @@ per-conversation persistence.
 
 ## Next actions
 
-1. **User verification of v0.2.0** on live ChatGPT in split-screen setup.
-   Confirm: rail visible by default, no text overlap, expansion reflows
-   cleanly, collapse state persists across refresh.
-2. **Step 5.5 — ConCon Check (heuristic)** implementation.
-3. **Step 6 — bundled local model runtime.**
-4. **Save to GitHub** so the repo is durable independent of this session.
+1. **User verification of v0.5.0** on live ChatGPT: side-load, confirm
+   the coverage strip appears when opening an existing (long) chat, that
+   "fill in earlier" scrolls to top and backfills the ledger, and that
+   inline drift markers appear as colored strips on turn wrappers.
+2. **Step 7 — Referent tracker** (P1, ~40 coins). Detects ambiguous
+   pronouns and tracks bindings. Was deferred from v0.5.0 for coin budget.
+3. **Chrome storage.local migration** (P2, ~30 coins). Emmy suggested
+   moving vigilance prefs, custom rules, and FTU flag out of localStorage
+   (visible to chatgpt.com scripts) into extension-isolated storage.
+   Legitimate privacy hygiene improvement but not a doctrine breach —
+   the current localStorage data is preferences, not secrets. Defer.
+4. **Step 6 — bundled local model runtime.**
+5. **Save to GitHub** so the repo is durable independent of this session.
