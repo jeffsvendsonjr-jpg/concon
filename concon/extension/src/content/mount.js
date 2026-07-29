@@ -22,6 +22,7 @@ import {
   transitionLedgerEntry,
   reExtractConversation,
 } from '../core/store.js';
+import { resetCoverage } from '../core/coverage.js';
 
 const HOST_ID = 'concon-panel-host';
 
@@ -122,11 +123,16 @@ function refreshPanel() {
 async function onConversationChange() {
   const newId = parseConversationId();
   if (newId === currentConversationId) return;
+  const previousId = currentConversationId;
   currentConversationId = newId;
   // A new conversation means transient panel views (Check report, rules
   // editor) should not carry over. Otherwise a report generated for
   // conversation A can render against B's data on the next refresh.
   resetPanelViews();
+  // Coverage for the previous conversation is now stale — we're no
+  // longer observing it, so anything we knew about which turns we saw
+  // shouldn't influence a future audit of it.
+  if (previousId) resetCoverage(previousId);
   detachObserver();
   if (typeof unsubscribeTurns === 'function') { unsubscribeTurns(); unsubscribeTurns = null; }
   if (typeof unsubscribeLedger === 'function') { unsubscribeLedger(); unsubscribeLedger = null; }

@@ -44,3 +44,17 @@ export function extractText(el) {
   // innerText, but fall back to textContent for non-DOM contexts (jsdom).
   return (container.innerText ?? container.textContent ?? '').trim();
 }
+
+// Extract the turn index from ChatGPT's `data-testid="conversation-turn-N"`.
+// Used by coverage tracking to detect gaps in observed turns. Returns null
+// if the enclosing turn wrapper is missing or the testid is malformed.
+export function extractTurnIndex(el) {
+  if (!el) return null;
+  const turnEl = el.closest?.(selectors.turnArticle);
+  if (!turnEl) return null;
+  const testid = turnEl.getAttribute?.('data-testid') || '';
+  const m = testid.match(/^conversation-turn-(\d+)$/);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
