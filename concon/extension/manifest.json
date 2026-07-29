@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ConCon",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Bridge the human/LLM communication gap. Local, offline, no telemetry.",
   "host_permissions": ["https://chatgpt.com/*"],
   "permissions": ["storage"],
@@ -27,6 +27,7 @@
         "src/core/ledger.js",
         "src/core/search.js",
         "src/core/concon-check.js",
+        "src/core/coverage.js",
         "src/core/vigilance.js",
         "src/core/custom-rules.js",
         "src/panel/panel.js"

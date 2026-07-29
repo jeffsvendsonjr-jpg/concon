@@ -149,11 +149,11 @@ test('formatReportAsMarkdown handles empty-findings state cleanly', () => {
   assert.match(md, /clean/i);
 });
 
-test('formatReportAsMarkdown escapes hedged findings as (hedged)', () => {
+test('formatReportAsMarkdown escapes hedged findings as (soft)', () => {
   const messages = [msg({ id: 'a', order: 1, role: 'user', text: "I want Facebook if feasible." })];
   const ledger = buildLedgerFrom(messages);
   const report = runCheck({ messages, ledger, coverage: 'unknown' });
   const md = formatReportAsMarkdown(report);
-  assert.match(md, /_\(hedged\)_/);
+  assert.match(md, /_\(soft\)_/);
 });
 

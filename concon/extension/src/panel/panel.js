@@ -31,7 +31,9 @@ const STYLE = `
     flex-direction: column;
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
     background: #f6f2ea;
-    color: #1c1a17;
+    color: #12100c;
+    font-size: 14px;
+    font-weight: 500;
     border-left: 1px solid #d9d1c0;
     /* Deep panel elevation: floats over ChatGPT's flat surface. Inset
        highlight on the top-left simulates a raised edge catching light. */
@@ -41,6 +43,7 @@ const STYLE = `
       inset 1px 0 0 rgba(255, 253, 248, 0.9);
     z-index: 2147483647;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
   /* Letterpress: subtle 1px light shadow under serif characters mimics
@@ -173,8 +176,9 @@ const STYLE = `
     border-radius: 4px;
     background: #fbfaf7;
     font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
-    font-size: 13px;
-    color: #1c1a17;
+    font-size: 14px;
+    font-weight: 500;
+    color: #12100c;
     box-sizing: border-box;
     transition: border-color 0.15s ease, background 0.15s ease;
   }
@@ -253,8 +257,9 @@ const STYLE = `
   }
   .empty {
     padding: 20px;
-    color: #4a453b;
-    font-size: 13px;
+    color: #3a352b;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.6;
     border: 1px dashed #c9bfa9;
     border-radius: 4px;
@@ -294,16 +299,17 @@ const STYLE = `
     max-width: 100%;
     width: 100%;
     box-shadow: 0 12px 32px rgba(28, 26, 23, 0.22);
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.55;
-    color: #1c1a17;
+    color: #12100c;
     max-height: calc(100% - 20px);
     overflow-y: auto;
   }
   .overlay-card h4 {
     font-family: 'Iowan Old Style', Georgia, serif;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
     margin: 0 0 8px 0;
     text-shadow: 0 1px 0 rgba(255, 253, 248, 0.85);
   }
@@ -744,9 +750,10 @@ const STYLE = `
     color: #7a715f;
   }
   .finding-body {
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 500;
     line-height: 1.5;
-    color: #1c1a17;
+    color: #12100c;
   }
   .finding-hedge {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -760,8 +767,8 @@ const STYLE = `
     margin-top: 14px;
     padding: 10px 12px;
     border-left: 2px solid #d9d1c0;
-    font-size: 11px;
-    color: #7a715f;
+    font-size: 12px;
+    color: #5a5346;
     line-height: 1.55;
     font-style: italic;
   }
@@ -841,16 +848,17 @@ const STYLE = `
     border-color: rgba(148, 64, 45, 0.35);
   }
   .entry-body {
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.55;
-    color: #1c1a17;
+    color: #12100c;
     cursor: pointer;
     padding: 2px 0;
   }
   .entry-body:hover { color: #000; text-decoration: underline; text-decoration-color: #d9d1c0; text-underline-offset: 3px; }
   .entry.inferred .entry-body {
     font-style: italic;
-    color: #4a453b;
+    color: #3a352b;
   }
   .entry.resolved-neg .entry-body {
     text-decoration: line-through;
@@ -858,9 +866,10 @@ const STYLE = `
     opacity: 0.7;
   }
   .entry-body {
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 1.55;
-    color: #1c1a17;
+    color: #12100c;
     cursor: pointer;
     padding: 2px 0;
     border-bottom: 1px dotted transparent;
@@ -872,7 +881,7 @@ const STYLE = `
   }
   .entry.inferred .entry-body {
     font-style: italic;
-    color: #4a453b;
+    color: #3a352b;
   }
   .hedge-note {
     display: inline-block;
@@ -942,14 +951,14 @@ const STYLE = `
 // -----------------------------------------------------------------------------
 const LABELS = {
   user: {
-    proposed:  { badge: 'proposed',  affirm: 'confirm', negate: 'dismiss', showActions: true },
+    proposed:  { badge: 'you said',  affirm: 'confirm', negate: 'dismiss', showActions: true },
     confirmed: { badge: 'confirmed', showActions: false, resolvedAffirm: true },
-    dismissed: { badge: 'dismissed', showActions: false, resolvedNeg: true },
+    dismissed: { badge: 'dropped',   showActions: false, resolvedNeg: true },
   },
   assistant: {
-    asserted:     { badge: 'asserted',     affirm: 'acknowledge', negate: 'contest', showActions: true },
-    acknowledged: { badge: 'acknowledged', showActions: false, resolvedAffirm: true },
-    contested:    { badge: 'contested',    showActions: false,   resolvedNeg: true },
+    asserted:     { badge: 'claim',       affirm: 'got it',  negate: 'wrong', showActions: true },
+    acknowledged: { badge: 'noted',       showActions: false, resolvedAffirm: true },
+    contested:    { badge: 'pushed back', showActions: false, resolvedNeg: true },
   },
 };
 
@@ -1270,7 +1279,7 @@ export function renderPanel(shadowRoot, callbacks = {}) {
 
 const HELP_HTML = `
   <h4 data-testid="help-title">What ConCon does</h4>
-  <p>ConCon is a ledger of what you and ChatGPT have actually agreed to in this conversation. It reads each turn as it appears and pulls out commitment-shaped statements. You decide what counts.</p>
+  <p>ConCon is a ledger of what you and ChatGPT have actually agreed to in this conversation. It reads each turn as it appears and pulls out things that sound like commitments. You decide what counts.</p>
 
   <h5>Four concepts</h5>
   <ul>
@@ -1311,7 +1320,7 @@ function pickerHtml({ mandatory = false, firstRun = false, currentMode = 'balanc
     ? 'Welcome. Pick a vigilance mode to start.'
     : (mandatory ? 'Pick a vigilance mode' : 'Vigilance mode');
   const preamble = firstRun
-    ? `<p>Your choice of mode is itself an act of ratification — it tells the tool how much tapping you want to do. You can change this later per conversation via the mode chip in the header.</p>`
+    ? `<p>Your choice tells the tool how much to interrupt you. You can change it later per conversation via the mode chip in the header.</p>`
     : `<p>This choice applies to <em>this conversation</em>. Your global default stays unchanged.</p>`;
   const options = VIGILANCE_MODES.map((m) => {
     const selected = m === currentMode ? ' selected' : '';
@@ -1445,7 +1454,7 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
     body.innerHTML = `
       <div class="empty" data-testid="ledger-empty">
         <p><strong>Watching this conversation for drift.</strong></p>
-        <p>When you or ChatGPT commit to something, it lands here as a proposed entry. You decide what actually counts:</p>
+        <p>When you or ChatGPT commit to something, it lands here as a pending entry. You decide what actually counts:</p>
         <ul>
           <li><strong>Confirm</strong> — lock it into the shared record.</li>
           <li><strong>Contest</strong> — flag it as wrong or unwanted.</li>
@@ -1465,7 +1474,7 @@ export function updatePanel(shadowRoot, { conversation, viewMode = 'chronologica
     body.innerHTML = `
       <div class="empty" data-testid="ledger-empty-search">
         <p>No ledger entries match this search.</p>
-        <p>The counter above shows how many plain mentions appear in the transcript. Those live outside the ledger — the ledger only holds commitment-shaped statements.</p>
+        <p>The counter above shows how many plain mentions appear in the transcript. Those live outside the ledger — the ledger only holds things that sound like commitments.</p>
       </div>
     `;
     return;
@@ -1520,7 +1529,7 @@ function renderEntry(entry, searchQuery = '') {
     : '';
 
   const hedgeHtml = entry.hedged
-    ? `<span class="hedge-note" data-testid="ledger-hedge-marker">(hedged)</span>`
+    ? `<span class="hedge-note" data-testid="ledger-hedge-marker">(soft)</span>`
     : '';
 
   // Highlight the search hit within the sentence, if any.
@@ -1572,10 +1581,10 @@ function renderByTopic(fullLedger, outline, visibleEntries, searchQuery = '') {
 // -----------------------------------------------------------------------------
 
 const FINDING_LABELS = {
-  'stale-open':             'stale (unresolved for 5+ turns)',
-  'unresolved-human':       'your proposal — awaiting your ratification',
-  'unresolved-assistant':   'assistant assertion — awaiting your response',
-  'contested':              'contested — recorded disagreement',
+  'stale-open':             'sitting open (5+ turns)',
+  'unresolved-human':       'you said this — needs a yes/no',
+  'unresolved-assistant':   'the assistant claimed this — needs a yes/no',
+  'contested':              'pushed back — recorded disagreement',
 };
 
 function renderReport(report) {
@@ -1592,20 +1601,19 @@ function renderReport(report) {
 
   const scopeNote = `
     <div class="report-scope-note" data-testid="report-scope-note">
-      This is a state-integrity audit — a report of what the ledger already
-      knows. It does not yet reason about semantic drift between what the
-      assistant asserted and what you confirmed. Referent binding and
-      automatic divergence detection ship in a later phase; until then,
-      a "clean" report means <em>administratively</em> clean, not
-      <em>semantically</em> aligned.
+      This checks whether every commitment and claim has been resolved.
+      It doesn't yet compare what the assistant said against what you
+      actually confirmed — that comparison ships in a later phase.
+      A "clean" report means every entry has a yes/no on it, not that
+      the conversation is factually aligned.
     </div>
   `;
 
   const partialNote = report.status === 'partial' ? `
     <p>Coverage is <strong>${esc(report.coverage)}</strong>. ChatGPT
-    virtualizes long conversations — the extension may only have observed
-    the currently rendered section. Scroll through the full chat before
-    trusting a green result.</p>
+    hides older turns in long chats to save memory — the extension may
+    only have seen the currently visible section. Scroll all the way up
+    through the full chat before trusting a clean result.</p>
   ` : '';
 
   const counts = `

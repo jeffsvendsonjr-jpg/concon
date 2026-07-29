@@ -151,7 +151,7 @@ export function formatStatusHeadline(report) {
     return `PARTIAL — recorded ${turnCount} turns${coverage === 'unknown' ? ' (coverage unknown)' : ' (partial observation)'}`;
   }
   if (status === 'pass') {
-    return `PASS — recorded state is administratively clean`;
+    return `PASS — every entry resolved, ledger clean`;
   }
   // review
   const bits = [];
@@ -205,10 +205,10 @@ export function formatReportAsMarkdown(report, { url = null, timestamp = null } 
     }
     const kindOrder = ['stale-open', 'contested', 'unresolved-human', 'unresolved-assistant'];
     const kindLabels = {
-      'stale-open':            'Stale (unresolved for 5+ turns)',
-      'contested':             'Contested',
-      'unresolved-human':      'Your proposals awaiting your ratification',
-      'unresolved-assistant':  'Assistant assertions awaiting your response',
+      'stale-open':            'Sitting open (5+ turns)',
+      'contested':             'Pushed back',
+      'unresolved-human':      'You said this — needs a yes/no',
+      'unresolved-assistant':  'Assistant claim — needs a yes/no',
     };
     lines.push('## Findings');
     lines.push('');
@@ -219,7 +219,7 @@ export function formatReportAsMarkdown(report, { url = null, timestamp = null } 
       lines.push('');
       for (const f of items) {
         const age = f.ageInTurns === 0 ? 'this turn' : `${f.ageInTurns} turn${f.ageInTurns === 1 ? '' : 's'} ago`;
-        lines.push(`- ${f.hedged ? '_(hedged)_ ' : ''}"${f.sentence}"`);
+        lines.push(`- ${f.hedged ? '_(soft)_ ' : ''}"${f.sentence}"`);
         lines.push(`  — role: ${f.role || 'unknown'}, age: ${age}`);
       }
       lines.push('');
